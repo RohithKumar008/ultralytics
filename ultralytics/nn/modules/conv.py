@@ -864,13 +864,14 @@ class DeformableConv(nn.Module):
     Args:
         in_ch (int): Input channels.
         out_ch (int): Output channels.
-        stride (int): Stride of the convolution.
+        k (int): Kernel size.
+        s (int): Stride.
     """
 
-    def __init__(self, in_ch, out_ch, stride=1):
+    def __init__(self, in_ch, out_ch, k=3, s=1):
         super().__init__()
-        self.offset_conv = nn.Conv2d(in_ch, 18, kernel_size=3, stride=stride, padding=1)
-        self.deform_conv = DeformConv2d(in_ch, out_ch, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.offset_conv = nn.Conv2d(in_ch, 2 * k * k, kernel_size=k, stride=s, padding=k // 2)
+        self.deform_conv = DeformConv2d(in_ch, out_ch, kernel_size=k, stride=s, padding=k // 2, bias=False)
         self.bn = nn.BatchNorm2d(out_ch)
         self.act = nn.SiLU()
 
