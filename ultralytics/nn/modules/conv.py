@@ -619,7 +619,6 @@ class SpatialAttention(nn.Module):
         """
         return x * self.act(self.cv1(torch.cat([torch.mean(x, 1, keepdim=True), torch.max(x, 1, keepdim=True)[0]], 1)))
 
-
 class CBAM(nn.Module):
     """
     Convolutional Block Attention Module.
@@ -631,17 +630,16 @@ class CBAM(nn.Module):
         spatial_attention (SpatialAttention): Spatial attention module.
     """
 
-    def __init__(self, c1, kernel_size=7):
+    def __init__(self, c1):
         """
-        Initialize CBAM with given parameters.
+        Initialize CBAM with fixed kernel size 7 for spatial attention.
 
         Args:
             c1 (int): Number of input channels.
-            kernel_size (int): Size of the convolutional kernel for spatial attention.
         """
         super().__init__()
         self.channel_attention = ChannelAttention(c1)
-        self.spatial_attention = SpatialAttention(kernel_size)
+        self.spatial_attention = SpatialAttention(kernel_size=7)  # fixed kernel size
 
     def forward(self, x):
         """
@@ -653,8 +651,9 @@ class CBAM(nn.Module):
         Returns:
             (torch.Tensor): Attended output tensor.
         """
-        return self.spatial_attention(self.channel_attention(x))
-
+        x = self.channel_attention(x)
+        x = self.spatial_attention(x)
+        return x
 
 class Concat(nn.Module):
     """
