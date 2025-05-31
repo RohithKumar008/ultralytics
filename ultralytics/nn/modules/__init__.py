@@ -30,6 +30,7 @@ from .block import (
     SPP,
     SPPELAN,
     SPPF,
+    Add,
     A2C2f,
     AConv,
     ADown,
@@ -59,7 +60,6 @@ from .block import (
     ResNetLayer,
     SCDown,
     TorchVision,
-    Add,
 )
 from .conv import (
     CBAM,
@@ -134,6 +134,7 @@ __all__ = (
     "HGStem",
     "SPP",
     "SPPF",
+    "Add",
     "C1",
     "C2",
     "C3",
