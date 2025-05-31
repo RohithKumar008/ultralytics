@@ -7,6 +7,7 @@ from typing import List
 import numpy as np
 import torch
 import torch.nn as nn
+from torchvision.ops import DeformConv2d
 
 __all__ = (
     "Conv",
@@ -26,6 +27,7 @@ __all__ = (
     "DWSConv",
     "CondConv",
     "SE",
+    "DeformableConv",
 )
 
 
@@ -853,3 +855,26 @@ class SE(nn.Module):
 
     def forward(self, x):
         return x * self.fc(self.pool(x))
+
+
+class DeformableConv(nn.Module):
+    """
+    Deformable Convolution block with offset learning and activation.
+
+    Args:
+        in_ch (int): Input channels.
+        out_ch (int): Output channels.
+        stride (int): Stride of the convolution.
+    """
+
+    def __init__(self, in_ch, out_ch, stride=1):
+        super().__init__()
+        self.offset_conv = nn.Conv2d(in_ch, 18, kernel_size=3, stride=stride, padding=1)
+        self.deform_conv = DeformConv2d(in_ch, out_ch, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn = nn.BatchNorm2d(out_ch)
+        self.act = nn.SiLU()
+
+    def forward(self, x):
+        offset = self.offset_conv(x)
+        x = self.deform_conv(x, offset)
+        return self.act(self.bn(x))
