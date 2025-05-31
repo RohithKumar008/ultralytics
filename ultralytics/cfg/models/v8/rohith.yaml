@@ -1,6 +1,7 @@
 # ----------------------
 # Custom Backbone
 # ----------------------
+nc: 3
 backbone:
   # Stem + Stages (DWS, SE, CondConv, etc.)
   - [-1, 1, DWSConv, [32, 3, 2]]        # 0: Stem (640 → 320)
