@@ -116,6 +116,7 @@ __all__ = (
     "ChannelAttention",
     "SpatialAttention",
     "CBAM",
+    "DWSConv",
     "Concat",
     "TransformerLayer",
     "TransformerBlock",
