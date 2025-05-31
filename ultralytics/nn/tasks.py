@@ -75,6 +75,11 @@ from ultralytics.nn.modules import (
     YOLOESegment,
     v10Detect,
 )
+globals()['DWSConv'] = DWSConv
+globals()['CondConv'] = CondConv
+globals()['SE'] = SE
+globals()['DeformableConv'] = DeformableConv
+globals()['Add'] = Add
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
 from ultralytics.utils.loss import (
