@@ -76,6 +76,7 @@ from .conv import (
     RepConv,
     SpatialAttention,
     DWSConv,
+    CondConv,
 )
 from .head import (
     OBB,
@@ -117,6 +118,7 @@ __all__ = (
     "SpatialAttention",
     "CBAM",
     "DWSConv",
+    "CondConv",
     "Concat",
     "TransformerLayer",
     "TransformerBlock",
