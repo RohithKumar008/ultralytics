@@ -2044,3 +2044,4 @@ class Add(nn.Module):
         if isinstance(x, (list, tuple)):
             return torch.stack(x, dim=0).sum(dim=0)
         return x
+globals()['Add'] = Add
