@@ -62,6 +62,7 @@ from .block import (
 )
 from .conv import (
     CBAM,
+    SE,
     ChannelAttention,
     Concat,
     Conv,
@@ -117,6 +118,7 @@ __all__ = (
     "ChannelAttention",
     "SpatialAttention",
     "CBAM",
+    "SE",
     "DWSConv",
     "CondConv",
     "Concat",
