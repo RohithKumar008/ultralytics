@@ -52,6 +52,7 @@ __all__ = (
     "PSA",
     "SCDown",
     "TorchVision",
+    "Add",
 )
 
 
@@ -2031,3 +2032,15 @@ class SAVPE(nn.Module):
         aggregated = score.transpose(-2, -3) @ x.reshape(B, self.c, C // self.c, -1).transpose(-1, -2)
 
         return F.normalize(aggregated.transpose(-2, -3).reshape(B, Q, -1), dim=-1, p=2)
+
+
+
+class Add(nn.Module):
+    """Element-wise addition of a list of feature maps."""
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        if isinstance(x, (list, tuple)):
+            return torch.stack(x, dim=0).sum(dim=0)
+        return x
