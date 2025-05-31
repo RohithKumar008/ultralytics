@@ -75,6 +75,7 @@ from .conv import (
     LightConv,
     RepConv,
     SpatialAttention,
+    DWSConv,
 )
 from .head import (
     OBB,
