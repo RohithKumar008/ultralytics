@@ -1,0 +1,39 @@
+# ----------------------
+# Custom Backbone
+# ----------------------
+backbone:
+  # Stem + Stages (DWS, SE, CondConv, etc.)
+  - [-1, 1, DWSConv, [32, 3, 2]]     # 0: Stem (640 → 320)
+  - [-1, 1, DWSConv, [48, 3, 2]]     # 1: Stage 1 (320 → 160)
+  - [-1, 1, DWSConv, [64, 3, 2]]     # 2: Stage 2 (160 → 80)
+  - [-1, 1, SEBlock, [64]]           # 3
+  - [-2, 1, DWSConv, [128, 3, 2]]    # 4: Stage 3 (80 → 40)
+  - [-1, 1, SEBlock, [128]]          # 5 → C3
+  - [-1, 1, CondConv, [256, 3, 2]]   # 6: Stage 4 (40 → 20)
+  - [-1, 1, SEBlock, [256]]          # 7 → C4
+  - [-1, 1, DeformableConv, [512, 3, 2]] # 8: Stage 5 (20 → 10)
+  - [-1, 1, CBAM, [512]]             # 9
+  - [-1, 1, DeformableConv, [512, 3, 1]] # 10: Stage 6 (10 → 10)
+  - [-1, 1, CBAM, [512]]             # 11 → C5
+
+# ----------------------
+# Neck + Head (Manual BiFPN)
+# ----------------------
+head:
+  # 1x1 conv to reduce channels of C3, C4, C5
+  - [5, 1, Conv, [128, 1, 1]]     # 12: C3 reduced → p3
+  - [7, 1, Conv, [128, 1, 1]]     # 13: C4 reduced → p4
+  - [11, 1, Conv, [128, 1, 1]]    # 14: C5 reduced → p5
+
+  # Top-down path: p5 → p4
+  - [14, 1, nn.Upsample, [None, 2, "nearest"]] # 15
+  - [[13, 15], 1, Add, []]        # 16: p4 + up(p5)
+  - [-1, 1, Conv, [128, 3, 1]]    # 17: fused p4
+
+  # Top-down path: p4 → p3
+  - [17, 1, nn.Upsample, [None, 2, "nearest"]] # 18
+  - [[12, 18], 1, Add, []]        # 19: p3 + up(p4)
+  - [-1, 1, Conv, [128, 3, 1]]    # 20: fused p3
+
+  # Final Detect layer using p3 (40×40), p4 (20×20), p5 (10×10)
+  - [[20, 17, 14], 1, Detect, [nc]]  # 21
