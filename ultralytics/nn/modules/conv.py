@@ -23,6 +23,7 @@ __all__ = (
     "Concat",
     "RepConv",
     "Index",
+    "DWSConv",
 )
 
 
@@ -711,3 +712,51 @@ class Index(nn.Module):
             (torch.Tensor): Selected tensor.
         """
         return x[self.index]
+
+
+class DWSConv(nn.Module):
+    """
+    Depthwise Separable Convolution with BatchNorm and Activation.
+    
+    Attributes:
+        depthwise (nn.Conv2d): Depthwise convolution layer.
+        pointwise (nn.Conv2d): Pointwise convolution layer.
+        bn (nn.BatchNorm2d): Batch normalization.
+        act (nn.Module): Activation function.
+        default_act (nn.Module): Default activation (SiLU).
+    """
+
+    default_act = nn.SiLU()
+
+    def __init__(self, c1, c2, k=3, s=1, p=None, d=1, act=True):
+        """
+        Initialize the DWSConv layer.
+        
+        Args:
+            c1 (int): Input channels.
+            c2 (int): Output channels.
+            k (int): Kernel size.
+            s (int): Stride.
+            p (int, optional): Padding. Defaults to autopad.
+            d (int): Dilation.
+            act (bool | nn.Module): Activation type.
+        """
+        super().__init__()
+        self.depthwise = nn.Conv2d(c1, c1, k, s, autopad(k, p, d), groups=c1, dilation=d, bias=False)
+        self.pointwise = nn.Conv2d(c1, c2, 1, bias=False)
+        self.bn = nn.BatchNorm2d(c2)
+        self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
+
+    def forward(self, x):
+        """
+        Forward pass applying depthwise → pointwise → BN → activation.
+        
+        Args:
+            x (torch.Tensor): Input tensor.
+        
+        Returns:
+            torch.Tensor: Output tensor.
+        """
+        x = self.depthwise(x)
+        x = self.pointwise(x)
+        return self.act(self.bn(x))
