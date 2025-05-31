@@ -25,6 +25,7 @@ __all__ = (
     "Index",
     "DWSConv",
     "CondConv",
+    "SE",
 )
 
 
@@ -833,3 +834,22 @@ class CondConv(nn.Module):
 
         out = torch.cat(outputs, dim=0)  # (B, c2, H_out, W_out)
         return self.act(self.bn(out))
+
+class SE(nn.Module):
+    """
+    Squeeze-and-Excitation (SE) block using Conv2d for channel recalibration.
+    """
+
+    def __init__(self, c1, reduction=16):
+        super().__init__()
+        c_ = max(1, c1 // reduction)
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Conv2d(c1, c_, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(c_, c1, 1, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        return x * self.fc(self.pool(x))
