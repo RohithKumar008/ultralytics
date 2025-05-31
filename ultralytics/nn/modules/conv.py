@@ -878,3 +878,8 @@ class DeformableConv(nn.Module):
         offset = self.offset_conv(x)
         x = self.deform_conv(x, offset)
         return self.act(self.bn(x))
+
+globals()['DWSConv'] = DWSConv
+globals()['CondConv'] = CondConv
+globals()['SE'] = SE
+globals()['DeformableConv'] = DeformableConv
