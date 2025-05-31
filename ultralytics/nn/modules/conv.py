@@ -24,6 +24,7 @@ __all__ = (
     "RepConv",
     "Index",
     "DWSConv",
+    "CondConv",
 )
 
 
@@ -760,3 +761,75 @@ class DWSConv(nn.Module):
         x = self.depthwise(x)
         x = self.pointwise(x)
         return self.act(self.bn(x))
+
+
+class CondConv(nn.Module):
+    """
+    Conditional Convolution Layer with multiple expert kernels and input-dependent routing.
+
+    Attributes:
+        expert_weights (nn.Parameter): Learnable expert kernels.
+        expert_bias (nn.Parameter): Learnable expert biases.
+        routing_fn (nn.Module): Learns expert weights based on input.
+        bn (nn.BatchNorm2d): Batch normalization layer.
+        act (nn.Module): Activation function.
+        default_act (nn.Module): Default activation function (SiLU).
+    """
+
+    default_act = nn.SiLU()
+
+    def __init__(self, c1, c2, k=3, s=1, p=None, d=1, act=True, num_experts=4):
+        """
+        Initialize CondConv layer.
+
+        Args:
+            c1 (int): Number of input channels.
+            c2 (int): Number of output channels.
+            k (int): Kernel size.
+            s (int): Stride.
+            p (int, optional): Padding. Uses autopad if None.
+            d (int): Dilation.
+            act (bool | nn.Module): Activation.
+            num_experts (int): Number of expert convolution kernels.
+        """
+        super().__init__()
+        self.k = k
+        self.s = s
+        self.d = d
+        self.p = autopad(k, p, d)
+        self.num_experts = num_experts
+
+        # Expert weights and bias
+        self.expert_weights = nn.Parameter(torch.randn(num_experts, c2, c1, k, k))
+        self.expert_bias = nn.Parameter(torch.randn(num_experts, c2))
+
+        # Routing function (global avg pooling + FC)
+        self.routing_fn = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(),
+            nn.Linear(c1, num_experts),
+            nn.Sigmoid()
+        )
+
+        self.bn = nn.BatchNorm2d(c2)
+        self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
+
+    def forward(self, x):
+        B = x.size(0)
+        routing_weights = self.routing_fn(x)  # (B, num_experts)
+
+        # Weighted combination of expert weights and biases
+        weight = torch.einsum('be,eocij->bocij', routing_weights, self.expert_weights)  # (B, c2, c1, k, k)
+        bias = torch.einsum('be,eo->bo', routing_weights, self.expert_bias)             # (B, c2)
+
+        # Apply sample-wise convolution
+        outputs = []
+        for i in range(B):
+            xi = x[i:i+1]
+            wi = weight[i]
+            bi = bias[i]
+            yi = F.conv2d(xi, wi, bi, stride=self.s, padding=self.p, dilation=self.d)
+            outputs.append(yi)
+
+        out = torch.cat(outputs, dim=0)  # (B, c2, H_out, W_out)
+        return self.act(self.bn(out))
