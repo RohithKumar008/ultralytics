@@ -20,7 +20,7 @@ backbone:
   - [-1, 1, CBAM, [512]]                # 11
 
 # Neck + Head Fusion via FC-like layer
-neck:
+head :
   # Project C3, C4, C5 to same channels (256)
   - [5, 1, Conv, [256, 1, 1]]           # 12: proj_C3
   - [7, 1, Conv, [256, 1, 1]]           # 13: proj_C4
