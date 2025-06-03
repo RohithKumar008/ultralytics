@@ -16,31 +16,30 @@ backbone:
   - [-1, 1, CBAM, [512]]                 # 11: C5
 
 head:
-  # -------- FC-style fusion with multi-scale outputs --------
   # Project C3, C4, C5 to common channels
-  - [5, 1, Conv, [256, 1, 1]]   # 12: P3
-  - [7, 1, Conv, [256, 1, 1]]   # 13: P4
-  - [11, 1, Conv, [256, 1, 1]]  # 14: P5
+  - [5, 1, Conv, [256, 1, 1]]        # 12: P3
+  - [7, 1, Conv, [256, 1, 1]]        # 13: P4
+  - [11, 1, Conv, [256, 1, 1]]       # 14: P5
 
   # Upsample to match P3 (1/8) and concat for small head
-  - [13, 1, Upsample, [None, 2]]     # 15
-  - [14, 1, Upsample, [None, 4]]     # 16
-  - [[12,15,16], 1, Concat, [1]]     # 17
-  - [-1, 1, Conv, [256, 3, 1]]       # 18
+  - [13, 1, nn.Upsample, [None, 2, "nearest"]]    # 15: Upsample x2
+  - [14, 1, nn.Upsample, [None, 4, "nearest"]]    # 16: Upsample x4
+  - [[12,15,16], 1, Concat, [1]]                   # 17
+  - [-1, 1, Conv, [256, 3, 1]]                      # 18
 
   # Mix for medium head (P4 resolution → 1/16)
-  - [12, 1, Downsample, [2]]         # 19
-  - [14, 1, Upsample, [None, 2]]     # 20
-  - [[19,13,20], 1, Concat, [1]]     # 21
-  - [-1, 1, Conv, [256, 3, 1]]       # 22
+  - [12, 1, Conv, [256, 3, 2]]                      # 19: Downsample x2 (stride=2 conv)
+  - [14, 1, nn.Upsample, [None, 2, "nearest"]]      # 20: Upsample x2
+  - [[19,13,20], 1, Concat, [1]]                    # 21
+  - [-1, 1, Conv, [256, 3, 1]]                      # 22
 
-  # Mix for large head (P5 resolution → 1/32)Add commentMore actions
-  - [12, 1, Downsample, [4]]         # 23
-  - [13, 1, Downsample, [2]]         # 24
-  - [[23,24,14], 1, Concat, [1]]     # 25
-  - [-1, 1, Conv, [256, 3, 1]]       # 26
+  # Mix for large head (P5 resolution → 1/32)
+  - [12, 1, Conv, [256, 3, 4]]                      # 23: Downsample x4 (stride=4 conv)
+  - [13, 1, Conv, [256, 3, 2]]                      # 24: Downsample x2 (stride=2 conv)
+  - [[23,24,14], 1, Concat, [1]]                    # 25
+  - [-1, 1, Conv, [256, 3, 1]]                      # 26
 
   # Detect heads
-  - [18, 1, Detect, [nc]]   # Detect at 1/8
-  - [22, 1, Detect, [nc]]   # Detect at 1/16
-  - [26, 1, Detect, [nc]]   # Detect at 1/32
+  - [18, 1, Detect, [nc]]                            # Detect at 1/8
+  - [22, 1, Detect, [nc]]                            # Detect at 1/16
+  - [26, 1, Detect, [nc]]                            # Detect at 1/32
