@@ -20,20 +20,12 @@ backbone:
   - [-1, 1, CBAM, [512]]                # 11
 
 # Neck + Head Fusion via FC-like layer
-head :
-  # Project C3, C4, C5 to same channels (256)
-  - [5, 1, Conv, [256, 1, 1]]           # 12: proj_C3
-  - [7, 1, Conv, [256, 1, 1]]           # 13: proj_C4
-  - [9, 1, Conv, [256, 1, 1]]           # 14: proj_C5
-
-  # Concatenate along channels → [768, H, W]
-  - [[12,13,14], 1, Concat, [1]]        # 15: concat_C345
-
-  # FC-style fusion for 3 scales
-  - [15, 1, Conv, [256, 1, 1]]          # 16: fusion_small
-  - [15, 1, Conv, [256, 1, 1]]          # 17: fusion_medium
-  - [15, 1, Conv, [256, 1, 1]]          # 18: fusion_large
-
-# Detect
 head:
-  [[16, 17, 18], 1, Detect, [nc]]       # 19
+  - [5, 1, Conv, [256, 1, 1]]     # 12: proj_C3
+  - [7, 1, Conv, [256, 1, 1]]     # 13: proj_C4
+  - [9, 1, Conv, [256, 1, 1]]     # 14: proj_C5
+  - [[12,13,14], 1, Concat, [1]]  # 15: concat_C345
+  - [15, 1, Conv, [256, 1, 1]]    # 16: fusion_small
+  - [15, 1, Conv, [256, 1, 1]]    # 17: fusion_medium
+  - [15, 1, Conv, [256, 1, 1]]    # 18: fusion_large
+  - [[16,17,18], 1, Detect, [nc]] # 19: Detect
