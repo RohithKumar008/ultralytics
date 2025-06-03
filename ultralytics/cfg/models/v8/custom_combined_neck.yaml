@@ -1,0 +1,39 @@
+# Parameters
+nc: 3  # number of classes
+depth_multiple: 1.0
+width_multiple: 1.0
+
+# Backbone
+backbone:
+  # Stem + Stages
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: Stem (640 → 320)
+  - [-1, 1, DWSConv, [48, 3, 2]]        # 1: Stage 1 (320 → 160)
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 2: Stage 2 (160 → 80)
+  - [-1, 1, SE, [64]]                   # 3
+  - [-2, 1, DWSConv, [128, 3, 2]]       # 4: Stage 3 (80 → 40)
+  - [-1, 1, SE, [128]]                  # 5 → C3
+  - [-1, 1, CondConv, [256, 3, 2]]      # 6: Stage 4 (40 → 20)
+  - [-1, 1, SE, [256]]                  # 7 → C4
+  - [-1, 1, DeformableConv, [512, 3, 2]]# 8: Stage 5 (20 → 10)
+  - [-1, 1, CBAM, [512]]                # 9 → C5
+  - [-1, 1, DeformableConv, [512, 3, 1]]# 10: Stage 6 (10 → 10)
+  - [-1, 1, CBAM, [512]]                # 11
+
+# Neck + Head Fusion via FC-like layer
+neck:
+  # Project C3, C4, C5 to same channels (256)
+  - [5, 1, Conv, [256, 1, 1]]           # 12: proj_C3
+  - [7, 1, Conv, [256, 1, 1]]           # 13: proj_C4
+  - [9, 1, Conv, [256, 1, 1]]           # 14: proj_C5
+
+  # Concatenate along channels → [768, H, W]
+  - [[12,13,14], 1, Concat, [1]]        # 15: concat_C345
+
+  # FC-style fusion for 3 scales
+  - [15, 1, Conv, [256, 1, 1]]          # 16: fusion_small
+  - [15, 1, Conv, [256, 1, 1]]          # 17: fusion_medium
+  - [15, 1, Conv, [256, 1, 1]]          # 18: fusion_large
+
+# Detect
+head:
+  [[16, 17, 18], 1, Detect, [nc]]       # 19
