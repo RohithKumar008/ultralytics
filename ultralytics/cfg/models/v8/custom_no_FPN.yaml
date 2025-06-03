@@ -21,10 +21,24 @@ backbone:
 # Head (Direct Detection without FPN)
 # ----------------------
 head:
-  # Reduce channels
-  - [5, 1, Conv, [128, 1, 1]]           # 12: C3 reduced → p3 (40x40)
-  - [7, 1, Conv, [128, 1, 1]]           # 13: C4 reduced → p4 (20x20)
-  - [11, 1, Conv, [128, 1, 1]]          # 14: C5 reduced → p5 (10x10)
+  # Upsample and concat features
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # Upsample from last layer by 2
+  - [[-1, 6], 1, Concat, [1]]                   # Concat with backbone layer 6 (P4)
+  - [-1, 3, C2f, [512]]                         # Process concat output
 
-  # Direct detection using p3, p4, p5
-  - [[12, 13, 14], 1, Detect, [nc]]     # 15: Detect heads on P3, P4, P5
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # Upsample again
+  - [[-1, 4], 1, Concat, [1]]                   # Concat with backbone layer 4 (P3)
+  - [-1, 3, C2f, [256]]                         # Process concat output (small scale head)
+
+  # Downsample and concat for medium scale
+  - [-1, 1, Conv, [256, 3, 2]]                  # Downsample
+  - [[-1, 12], 1, Concat, [1]]                  # Concat with previous layer 12
+  - [-1, 3, C2f, [512]]                         # Process concat output (medium scale head)
+
+  # Downsample and concat for large scale
+  - [-1, 1, Conv, [512, 3, 2]]                  # Downsample
+  - [[-1, 9], 1, Concat, [1]]                   # Concat with previous layer 9
+  - [-1, 3, C2f, [1024]]                        # Process concat output (large scale head)
+
+  # Final detection heads on P3, P4, P5
+  - [[15, 18, 21], 1, Detect, [nc]]
