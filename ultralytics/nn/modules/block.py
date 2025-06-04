@@ -2042,6 +2042,6 @@ class Add(nn.Module):
 
     def forward(self, x):
         if isinstance(x, (list, tuple)):
-            return torch.stack(x, dim=0).sum(dim=0)
+            return x[0] + x[1] if len(x) == 2 else sum(x)
         return x
 globals()['Add'] = Add
