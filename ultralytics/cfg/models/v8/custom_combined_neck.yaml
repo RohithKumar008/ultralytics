@@ -39,5 +39,5 @@ head:
   - [-1, 1, Conv, [128, 1, 1]]         # 23: Final P4 refined
 
   # ---- Detect ----
-  - [[20, 23, 14], 1, Detect, [nc]]    # 24: P3, P4, P5
+  - [[20, 23, 14], 1, Detect, [${nc}]]    # 24: P3, P4, P5
 
