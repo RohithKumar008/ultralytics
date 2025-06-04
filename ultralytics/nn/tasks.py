@@ -1694,14 +1694,23 @@ def parse_model(d, ch, verbose=True):
                 with contextlib.suppress(ValueError):
                     args[j] = locals()[a] if a in locals() else ast.literal_eval(a)
         n = n_ = max(round(n * depth), 1) if n > 1 else n  # depth gain
+        # Handle input channels
         if isinstance(f, int):
             c1 = ch[f]
         elif isinstance(f, list):
             c1 = [ch[i] for i in f]
+            if isinstance(m, str) and m in ['Concat', 'Add']:
+                c1 = sum(c1) if m == 'Add' else c1  # sum for Add, keep list for Concat
+            elif hasattr(m, '__name__') and m.__name__ in ['Concat', 'Add']:
+                c1 = sum(c1) if m.__name__ == 'Add' else c1
+            elif hasattr(m, '_get_name') and m._get_name() in ['Concat', 'Add']:
+                c1 = sum(c1) if m._get_name() == 'Add' else c1
         else:
-            raise TypeError(f"Unsupported input type for f: {type(f)}")
-        if m in base_modules:
-            c2 = args[0]
+            raise TypeError(f"Unsupported type of f: {type(f)}")
+        
+        # Construct module
+        if isinstance(m, str):
+            m = eval(m)  # convert string to class if needed
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
                 c2 = make_divisible(min(c2, max_channels) * width, 8)
             if m is C2fAttn:  # set 1) embed channels and 2) num heads
