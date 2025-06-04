@@ -58,6 +58,7 @@ from ultralytics.nn.modules import (
     CondConv,
     DeformableConv,
     Add,
+    AddBlock,
     SE,
     CBAM,
     LRPCHead,
@@ -1637,6 +1638,7 @@ def parse_model(d, ch, verbose=True):
             SE,
             CBAM,
             Add,
+            AddBlock,
             Focus,
             BottleneckCSP,
             C1,
@@ -1679,6 +1681,7 @@ def parse_model(d, ch, verbose=True):
             C2fCIB,
             C2PSA,
             A2C2f,
+            AddBlock,
         }
     )
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
