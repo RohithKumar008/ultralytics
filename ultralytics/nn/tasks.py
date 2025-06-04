@@ -1636,6 +1636,7 @@ def parse_model(d, ch, verbose=True):
             DeformableConv,
             SE,
             CBAM,
+            Add,
             Focus,
             BottleneckCSP,
             C1,
