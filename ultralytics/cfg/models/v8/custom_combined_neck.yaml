@@ -40,5 +40,5 @@ head :
   - [[16, 19], 1, nn.Add, []]           # 20: Mixed P4 + P3 → Final P4
 
   # Outputs: P3 (40x40,128), P4 (20x20,128), P5 (10x10,128)
-  - [[18, 20, 14], 1, Detect, [nc]]    # 21: Detect layer                      # 26
+  - [[18, 20, 14], 1, Detect, [nc]]    # 21: Detect layer
 
