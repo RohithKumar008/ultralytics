@@ -1698,7 +1698,8 @@ def parse_model(d, ch, verbose=True):
             c1 = ch[f]
         elif isinstance(f, list):
             c1 = [ch[i] for i in f]
-        
+        else:
+            raise TypeError(f"Unsupported input type for f: {type(f)}")
         if m in base_modules:
             c2 = args[0]
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
