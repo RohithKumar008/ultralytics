@@ -28,16 +28,16 @@ head :
   # ---- Stage 2: Bottom-Up Mixing (C5 → C4 → C3) ----
   # Mix C5 into C4 (no upsample! Strided conv instead)
   - [14, 1, DWSConv, [128, 3, 2]]      # 15: C5 (10x10→20x20, 128 ch)
-  - [[13, 15], 1, nn.Add, []]           # 16: C4 + C5 → Mixed P4
+  - [[13, 15], 1, Add, []]           # 16: C4 + C5 → Mixed P4
 
   # Mix result into C3 (again, strided conv)
   - [16, 1, DWSConv, [128, 3, 2]]      # 17: Mixed P4 (20x20→40x40, 128 ch)
-  - [[12, 17], 1, nn.Add, []]           # 18: C3 + Mixed P4 → Final P3
+  - [[12, 17], 1, Add, []]           # 18: C3 + Mixed P4 → Final P3
 
   # ---- Stage 3: Top-Down Refinement ----
   # Optional: Refine P4 by mixing P3 back down (lightweight)
   - [18, 1, DWSConv, [128, 3, 2]]      # 19: P3 (40x40→20x20, 128 ch)
-  - [[16, 19], 1, nn.Add, []]           # 20: Mixed P4 + P3 → Final P4
+  - [[16, 19], 1, Add, []]           # 20: Mixed P4 + P3 → Final P4
 
   # Outputs: P3 (40x40,128), P4 (20x20,128), P5 (10x10,128)
   - [[18, 20, 14], 1, Detect, [nc]]    # 21: Detect layer
