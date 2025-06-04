@@ -19,18 +19,25 @@ backbone:
 # Custom Neck (Optimized for Your Backbone)
 # ----------------------
 head:
+  # ---- Stage 1: Channel Reduction ----
   - [5, 1, DWSConv, [128, 1, 1]]       # 12: C3 → 128 ch (P3)
   - [7, 1, DWSConv, [128, 1, 1]]       # 13: C4 → 128 ch (P4)
   - [11, 1, DWSConv, [128, 1, 1]]      # 14: C5 → 128 ch (P5)
 
-  - [14, 1, DWSConv, [128, 3, 2]]      # 15: C5 → up to 20x20
-  - [[13, 15], 1, AddBlock, []]        # 16: C4 + upC5
+  # ---- Stage 2: Bottom-Up Mixing ----
+  - [14, 1, DWSConv, [128, 3, 2]]      # 15: C5 upsampled (→ P4 scale)
+  - [[13, 15], 1, Concat, [1]]         # 16: Concat C4 + P5'
+  - [-1, 1, Conv, [128, 1, 1]]         # 17: Fuse → P4 fused
 
-  - [16, 1, DWSConv, [128, 3, 2]]      # 17: Mix into 40x40
-  - [[12, 17], 1, AddBlock, []]        # 18: C3 + Mixed P4
+  - [17, 1, DWSConv, [128, 3, 2]]      # 18: P4 fused upsampled (→ P3 scale)
+  - [[12, 18], 1, Concat, [1]]         # 19: Concat C3 + P4'
+  - [-1, 1, Conv, [128, 1, 1]]         # 20: Fuse → Final P3
 
-  - [18, 1, DWSConv, [128, 3, 2]]      # 19: P3 downsampled
-  - [[16, 19], 1, AddBlock, []]        # 20: Mixed P4 + P3
+  # ---- Stage 3: Top-Down Refinement ----
+  - [20, 1, DWSConv, [128, 3, 2]]      # 21: P3 downsampled (→ P4 scale)
+  - [[17, 21], 1, Concat, [1]]         # 22: Concat P4 + P3↓
+  - [-1, 1, Conv, [128, 1, 1]]         # 23: Final P4 refined
 
-  - [[18, 20, 14], 1, Detect, [nc]]    # 21: Detect
+  # ---- Detect ----
+  - [[20, 23, 14], 1, Detect, [nc]]    # 24: P3, P4, P5
 
