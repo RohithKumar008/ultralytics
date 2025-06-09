@@ -1,0 +1,47 @@
+# ----------------------
+# Custom Backbone
+# ----------------------
+nc: 3
+backbone:
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: Stem
+  - [-1, 1, DWSConv, [48, 3, 2]]        # 1: Stage 1
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 2: Stage 2
+  - [-1, 1, SE, [64]]                   # 3 → P2 source
+  - [-2, 1, DWSConv, [128, 3, 2]]       # 4: Stage 3
+  - [-1, 1, SE, [128]]                  # 5 → C3
+  - [-1, 1, CondConv, [256, 3, 2]]      # 6: Stage 4
+  - [-1, 1, SE, [256]]                  # 7 → C4
+  - [-1, 1, DeformableConv, [512, 3, 2]] # 8: Stage 5
+  - [-1, 1, CBAM, [512]]                # 9
+  - [-1, 1, DeformableConv, [512, 3, 1]] # 10: Stage 6
+  - [-1, 1, CBAM, [512]]                # 11 → C5
+
+# ----------------------
+# Neck + Head (Enhanced FPN with P2)
+# ----------------------
+head:
+  # Reduce SE[64] (from #3) to 128 channels → P2
+  - [3, 1, Conv, [128, 1, 1]]          # 12: reduced P2
+
+  # Reduce channels of C3, C4, C5
+  - [5, 1, Conv, [128, 1, 1]]          # 13: C3 → p3
+  - [7, 1, Conv, [128, 1, 1]]          # 14: C4 → p4
+  - [11, 1, Conv, [128, 1, 1]]         # 15: C5 → p5
+
+  # Upsample p5 → concat with p4 → fuse p4
+  - [15, 1, nn.Upsample, [None, 2, "nearest"]] # 16
+  - [[14, 16], 1, Concat, [1]]         # 17
+  - [-1, 1, Conv, [128, 3, 1]]         # 18: fused p4
+
+  # Upsample fused p4 → concat with p3 → fuse p3
+  - [18, 1, nn.Upsample, [None, 2, "nearest"]] # 19
+  - [[13, 19], 1, Concat, [1]]         # 20
+  - [-1, 1, Conv, [128, 3, 1]]         # 21: fused p3
+
+  # Upsample fused p3 → concat with p2 → fuse p2
+  - [21, 1, nn.Upsample, [None, 2, "nearest"]] # 22
+  - [[12, 22], 1, Concat, [1]]         # 23
+  - [-1, 1, Conv, [128, 3, 1]]         # 24: fused p2
+
+  # Final detect head on [P2, P3, P4, P5]
+  - [[24, 21, 18, 15], 1, Detect, [nc]] # 25: Detect on P2, P3, P4, P5
