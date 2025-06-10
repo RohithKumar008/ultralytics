@@ -946,7 +946,8 @@ class MobileViT(nn.Module):
         print("Input to MobileViT:", x.shape)  # Expecting [B, 512, 4, 4]
 
         B, C, H, W = x.shape
-        ph, pw = self.patch_size
+        ph= 2
+        pw =2
 
         # Step 1: Local representation
         x = self.local_rep(x)  # [B, transformer_dim, 4, 4]
