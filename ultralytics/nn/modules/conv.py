@@ -31,6 +31,7 @@ __all__ = (
     "SAMO",
     "ECA",
     "SimpleGate",
+    "MobileViT",
 )
 
 
@@ -910,7 +911,29 @@ class SimpleGate(nn.Module):
         x = self.conv(x)
         c = x.shape[1] // 2
         return x[:, :c] * x[:, c:]
-        
+
+class MobileViT(nn.Module):
+    def __init__(self, dim, depth=2, patch_size=(2, 4), kernel_size=3):
+        super().__init__()
+        self.local_rep = nn.Sequential(
+            nn.Conv2d(dim, dim, kernel_size, padding=kernel_size // 2, groups=dim),
+            nn.Conv2d(dim, dim, kernel_size=1)
+        )
+        self.transformer = nn.Sequential(*[
+            nn.TransformerEncoderLayer(d_model=dim, nhead=4, batch_first=True)
+            for _ in range(depth)
+        ])
+        self.patch_size = patch_size
+
+    def forward(self, x):
+        y = self.local_rep(x)
+        B, C, H, W = y.shape
+        Ph, Pw = self.patch_size
+        y = y.reshape(B, C, H // Ph, Ph, W // Pw, Pw).permute(0, 2, 4, 3, 5, 1).reshape(B, -1, C)
+        y = self.transformer(y)
+        y = y.reshape(B, H // Ph, W // Pw, Ph, Pw, C).permute(0, 5, 1, 3, 2, 4).reshape(B, C, H, W)
+        return x + y
+
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
 globals()['SE'] = SE
@@ -918,3 +941,4 @@ globals()['DeformableConv'] = DeformableConv
 globals()['SAMO'] = SAMO
 globals()['ECA'] = ECA
 globals()['SimpleGate'] = SimpleGate
+globals()['MobileViT'] = MobileViT
