@@ -862,22 +862,25 @@ class SAMO(nn.Module):
         mask = self.sigmoid(self.conv(x))  # [B, 1, H, W]
         return x * mask  # Broadcasted element-wise modulation
 
+import torch
+import torch.nn as nn
+
 class ECA(nn.Module):
     """
     Efficient Channel Attention (ECA) module.
     """
 
-    def __init__(self, c1, c2=None, k_size=3):  # c2 is ignored, for compatibility with Ultralytics parser
+    def __init__(self, c1, c2=None, k_size=3):  # c2 is ignored, kept for compatibility
         super().__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=k_size // 2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        b, c, _, _ = x.size()
-        y = self.avg_pool(x)  # [B, C, 1, 1]
-        y = self.conv(y.squeeze(-1).transpose(-1, -2))  # [B, 1, C]
-        y = self.sigmoid(y).transpose(-1, -2).unsqueeze(-1)  # [B, C, 1, 1]
+        y = self.avg_pool(x)             # [B, C, 1, 1]
+        y = y.squeeze(-1).transpose(1, 2)  # [B, 1, C]
+        y = self.conv(y)                   # [B, 1, C]
+        y = self.sigmoid(y).transpose(1, 2).unsqueeze(-1)  # [B, C, 1, 1]
         return x * y.expand_as(x)
         
 class SimpleGate(nn.Module):
