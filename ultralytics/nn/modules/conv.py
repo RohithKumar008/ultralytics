@@ -896,36 +896,17 @@ class SAMO(nn.Module):
 class ECA(nn.Module):
     """
     Efficient Channel Attention (ECA) module.
-
-    Attributes:
-        conv (nn.Conv1d): 1D convolution for local cross-channel interaction.
-        sigmoid (nn.Sigmoid): Activation function to generate channel weights.
     """
 
-    def __init__(self, channels, k_size=3):
-        """
-        Initialize ECA with adaptive kernel size (default 3).
-
-        Args:
-            channels (int): Number of input/output channels.
-            k_size (int): Kernel size for 1D conv.
-        """
+    def __init__(self, c1, c2=None, k_size=3):  # c2 is ignored, for compatibility with Ultralytics parser
         super().__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=(k_size - 1) // 2, bias=False)
+        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=k_size // 2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        """
-        Apply ECA attention to input tensor.
-
-        Args:
-            x (torch.Tensor): Input tensor [B, C, H, W].
-
-        Returns:
-            (torch.Tensor): Output tensor after channel-wise modulation.
-        """
-        y = self.avg_pool(x)            # [B, C, 1, 1]
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x)  # [B, C, 1, 1]
         y = self.conv(y.squeeze(-1).transpose(-1, -2))  # [B, 1, C]
         y = self.sigmoid(y).transpose(-1, -2).unsqueeze(-1)  # [B, C, 1, 1]
         return x * y.expand_as(x)
