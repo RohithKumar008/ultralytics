@@ -9,7 +9,7 @@ backbone:
 
   # Stage 1
   - [-1, 1, DWSConv, [48, 3, 2]]                # 1
-  - [-1, 1, SimpleGate, [48]]                   # 2
+  - [-1, 1, SE, [48]]                           # 2 ← replaced SimpleGate
 
   # Stage 2
   - [-1, 1, DWSConv, [64, 3, 2]]                # 3
@@ -27,7 +27,7 @@ backbone:
 
   # Stage 5
   - [-1, 1, DWSConv, [384, 3, 2]]               # 11
-  - [-1, 1, SimpleGate, [384]]                  # 12
+  - [-1, 1, SE, [384]]                          # 12 ← replaced SimpleGate
   - [[9, 12], 1, Concat, [1]]                   # 13 → C5
 
 head:
