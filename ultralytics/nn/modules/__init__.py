@@ -83,6 +83,7 @@ from .conv import (
     DeformableConv,
     SimpleGate,
     ECA,
+    MobileViT,
 )
 from .head import (
     OBB,
@@ -130,6 +131,7 @@ __all__ = (
     "DeformableConv",
     "ECA",
     "SimpleGate",
+    "MobileViT",
     "Concat",
     "TransformerLayer",
     "TransformerBlock",
