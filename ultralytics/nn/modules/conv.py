@@ -934,10 +934,13 @@ class MobileViT(nn.Module):
         print("Input to MobileViT:", x.shape)
         y = self.local_rep(x)
         B, C, H, W = y.shape
+        print("Before reshape:", y.shape)
         Ph, Pw = self.patch_size
         y = y.reshape(B, C, H // Ph, Ph, W // Pw, Pw).permute(0, 2, 4, 3, 5, 1).reshape(B, -1, C)
         y = self.transformer(y)
         y = y.reshape(B, H // Ph, W // Pw, Ph, Pw, C).permute(0, 5, 1, 3, 2, 4).reshape(B, C, H, W)
+        print("B:", B, "C:", C, "H:", H, "W:", W, "Ph:", Ph, "Pw:", Pw)
+        print("Expected total elements:", B * C * H * W)
         return x + y
 
 globals()['DWSConv'] = DWSConv
