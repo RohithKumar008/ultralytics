@@ -1,49 +1,50 @@
-# ----------------------
-# Custom Backbone
-# ----------------------
+# efficient_skip.yaml
 nc: 3
+depth_multiple: 1.0
+width_multiple: 1.0
+
 backbone:
   # Stem
-  - [-1, 1, DWSConv, [32, 3, 2]]              # 0: Stem (640 → 320)
-  
+  - [-1, 1, DWSConv, [32, 3, 2]]                # 0
+
   # Stage 1
-  - [-1, 1, DWSConv, [48, 3, 2]]              # 1: (320 → 160)
-  - [-1, 1, ECA, [48]]                        # 2
+  - [-1, 1, DWSConv, [48, 3, 2]]                # 1
+  - [-1, 1, SimpleGate, [48]]                   # 2
 
   # Stage 2
-  - [-1, 1, DWSConv, [64, 3, 2]]              # 3: (160 → 80)
-  - [-1, 1, SimpleGate, [64]]                 # 4
+  - [-1, 1, DWSConv, [64, 3, 2]]                # 3
+  - [-1, 1, SE, [64]]                           # 4
+  - [[2, 4], 1, Concat, [1]]                    # 5 ← skip from 2
 
   # Stage 3
-  - [-1, 1, DWSConv, [128, 3, 2]]             # 5: (80 → 40)
-  - [-1, 1, ECA, [128]]                       # 6 → C3
+  - [-1, 1, DWSConv, [128, 3, 2]]               # 6
+  - [-1, 1, CBAM, [128]]                        # 7 → C3
 
   # Stage 4
-  - [-1, 1, GhostConv, [256, 3, 2]]           # 7: (40 → 20)
-  - [-1, 1, ECA, [256]]                       # 8 → C4
+  - [-1, 1, GhostConv, [256, 3, 2]]             # 8
+  - [-1, 1, CBAM, [256]]                        # 9
+  - [[7, 9], 1, Concat, [1]]                    # 10 → C4 (skip C3)
 
   # Stage 5
-  - [-1, 1, DeformableConv, [512, 3, 2]]      # 9: (20 → 10)
-  - [-1, 1, CBAM, [512]]                      # 10 → C5
+  - [-1, 1, DWSConv, [384, 3, 2]]               # 11
+  - [-1, 1, SimpleGate, [384]]                  # 12
+  - [[9, 12], 1, Concat, [1]]                   # 13 → C5 (skip C4)
 
-# ----------------------
-# Neck + Head (Standard FPN)
-# ----------------------
 head:
-  # Reduce channels to 128 for all three layers C3, C4, C5
-  - [6, 1, Conv, [128, 1, 1]]                 # 11: C3 reduced → p3
-  - [8, 1, Conv, [128, 1, 1]]                 # 12: C4 reduced → p4
-  - [10, 1, Conv, [128, 1, 1]]                # 13: C5 reduced → p5
+  # Reduce to 128 dims
+  - [7, 1, Conv, [128, 1, 1]]                   # 14: C3 → P3
+  - [10, 1, Conv, [128, 1, 1]]                  # 15: C4 → P4
+  - [13, 1, Conv, [128, 1, 1]]                  # 16: C5 → P5
 
-  # Upsample p5 and concat with p4
-  - [13, 1, nn.Upsample, [None, 2, "nearest"]] # 14
-  - [[12, 14], 1, Concat, [1]]                # 15
-  - [-1, 1, Conv, [128, 3, 1]]                # 16: fused p4
+  # P5 → P4 fusion
+  - [16, 1, nn.Upsample, [None, 2, "nearest"]]  # 17
+  - [[15, 17], 1, Concat, [1]]                  # 18
+  - [-1, 1, Conv, [128, 3, 1]]                  # 19
 
-  # Upsample fused p4 and concat with p3
-  - [16, 1, nn.Upsample, [None, 2, "nearest"]] # 17
-  - [[11, 17], 1, Concat, [1]]                # 18
-  - [-1, 1, Conv, [128, 3, 1]]                # 19: fused p3
+  # P4 → P3 fusion
+  - [19, 1, nn.Upsample, [None, 2, "nearest"]]  # 20
+  - [[14, 20], 1, Concat, [1]]                  # 21
+  - [-1, 1, Conv, [128, 3, 1]]                  # 22
 
-  # Final Detect layer using p3 (40×40), p4 (20×20), p5 (10×10)
-  - [[19, 16, 13], 1, Detect, [nc]]           # 20
+  # Detection
+  - [[22, 19, 16], 1, Detect, [nc]]             # 23
