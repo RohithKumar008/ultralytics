@@ -336,21 +336,13 @@ class Focus(nn.Module):
 
 
 class GhostConv(nn.Module):
-    """
-    Ghost Convolution module.
-    """
-
     def __init__(self, c1, c2, k=1, s=1, g=1, act=True):
         super().__init__()
-        c_ = c2 // 2  # hidden channels
-
-        # Primary convolution
+        c_ = c2 // 2  # mid channels
         self.cv1 = Conv(c1, c_, k, s, None, g, act=act)
 
-        # Ensure group count is valid: groups <= c_ and c_ % groups == 0
-        cheap_groups = c_ if c_ > 0 and c_ % c_ == 0 else 1
-
-        # Cheap convolution with safe grouping
+        # Only use groups=c_ if c_ divides c_
+        cheap_groups = c_ if c_ == 1 or c_ == c_ else 1
         self.cv2 = Conv(c_, c_, 5, 1, None, cheap_groups, act=act)
 
     def forward(self, x):
