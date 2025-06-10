@@ -931,6 +931,7 @@ class MobileViT(nn.Module):
             raise ValueError(f"Invalid patch_size format: {patch_size}")
 
     def forward(self, x):
+        print("Input to MobileViT:", x.shape)
         y = self.local_rep(x)
         B, C, H, W = y.shape
         Ph, Pw = self.patch_size
