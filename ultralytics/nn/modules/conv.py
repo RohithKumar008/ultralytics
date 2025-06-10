@@ -863,15 +863,16 @@ class SAMO(nn.Module):
 
     Attributes:
         conv (nn.Conv2d): 1×1 convolution to predict attention scores.
-        sigmoid (nn.Sigmoid): Activation function to map scores to [0, 1].
+        sigmoid (nn.Sigmoid): Sigmoid activation for attention mask.
     """
 
-    def __init__(self, c1):
+    def __init__(self, c1, c2=None):
         """
         Initialize SAMO layer.
 
         Args:
             c1 (int): Number of input channels.
+            c2 (int, optional): Ignored. Included for compatibility.
         """
         super().__init__()
         self.conv = nn.Conv2d(c1, 1, kernel_size=1)
@@ -882,13 +883,14 @@ class SAMO(nn.Module):
         Forward pass of SAMO.
 
         Args:
-            x (torch.Tensor): Input feature map of shape [B, C, H, W].
+            x (torch.Tensor): Input tensor of shape [B, C, H, W].
 
         Returns:
             torch.Tensor: Modulated feature map.
         """
         mask = self.sigmoid(self.conv(x))  # [B, 1, H, W]
-        return x * mask  # Element-wise modulation
+        return x * mask  # Broadcasted element-wise modulation
+        
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
 globals()['SE'] = SE
