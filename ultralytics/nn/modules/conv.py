@@ -29,6 +29,8 @@ __all__ = (
     "SE",
     "DeformableConv",
     "SAMO",
+    "ECA",
+    "SimpleGate",
 )
 
 
@@ -890,9 +892,79 @@ class SAMO(nn.Module):
         """
         mask = self.sigmoid(self.conv(x))  # [B, 1, H, W]
         return x * mask  # Broadcasted element-wise modulation
+
+class ECA(nn.Module):
+    """
+    Efficient Channel Attention (ECA) module.
+
+    Attributes:
+        conv (nn.Conv1d): 1D convolution for local cross-channel interaction.
+        sigmoid (nn.Sigmoid): Activation function to generate channel weights.
+    """
+
+    def __init__(self, channels, k_size=3):
+        """
+        Initialize ECA with adaptive kernel size (default 3).
+
+        Args:
+            channels (int): Number of input/output channels.
+            k_size (int): Kernel size for 1D conv.
+        """
+        super().__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=(k_size - 1) // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        """
+        Apply ECA attention to input tensor.
+
+        Args:
+            x (torch.Tensor): Input tensor [B, C, H, W].
+
+        Returns:
+            (torch.Tensor): Output tensor after channel-wise modulation.
+        """
+        y = self.avg_pool(x)            # [B, C, 1, 1]
+        y = self.conv(y.squeeze(-1).transpose(-1, -2))  # [B, 1, C]
+        y = self.sigmoid(y).transpose(-1, -2).unsqueeze(-1)  # [B, C, 1, 1]
+        return x * y.expand_as(x)
         
+class SimpleGate(nn.Module):
+    """
+    SimpleGate module.
+
+    Splits input along channel dimension and performs element-wise multiplication.
+    """
+
+    def __init__(self, channels):
+        """
+        Initialize SimpleGate.
+
+        Args:
+            channels (int): Number of input/output channels (must be even).
+        """
+        super().__init__()
+        assert channels % 2 == 0, "SimpleGate input channels must be even"
+        self.conv = Conv(channels, channels, k=1, s=1, act=False)
+
+    def forward(self, x):
+        """
+        Forward pass of SimpleGate.
+
+        Args:
+            x (torch.Tensor): Input tensor [B, C, H, W].
+
+        Returns:
+            (torch.Tensor): Output tensor.
+        """
+        x = self.conv(x)
+        c = x.shape[1] // 2
+        return x[:, :c] * x[:, c:]
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
 globals()['SE'] = SE
 globals()['DeformableConv'] = DeformableConv
 globals()['SAMO'] = SAMO
+globals()['ECA'] = ECA
+globals()['SimpleGate'] = SimpleGate
