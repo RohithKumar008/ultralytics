@@ -1,4 +1,4 @@
-# efficient_skip.yaml
+# efficient_skip_v2.yaml
 nc: 3
 depth_multiple: 1.0
 width_multiple: 1.0
@@ -14,21 +14,21 @@ backbone:
   # Stage 2
   - [-1, 1, DWSConv, [64, 3, 2]]                # 3
   - [-1, 1, SE, [64]]                           # 4
-  - [[2, 4], 1, Concat, [1]]                    # 5 ← skip from 2
+  - [[2, 4], 1, Concat, [1]]                    # 5 ← skip from Stage 1
 
   # Stage 3
   - [-1, 1, DWSConv, [128, 3, 2]]               # 6
   - [-1, 1, CBAM, [128]]                        # 7 → C3
 
   # Stage 4
-  - [-1, 1, GhostConv, [256, 3, 2]]             # 8
+  - [-1, 1, DWSConv, [256, 3, 2]]               # 8 ← replaced GhostConv
   - [-1, 1, CBAM, [256]]                        # 9
-  - [[7, 9], 1, Concat, [1]]                    # 10 → C4 (skip C3)
+  - [[7, 9], 1, Concat, [1]]                    # 10 → C4
 
   # Stage 5
   - [-1, 1, DWSConv, [384, 3, 2]]               # 11
   - [-1, 1, SimpleGate, [384]]                  # 12
-  - [[9, 12], 1, Concat, [1]]                   # 13 → C5 (skip C4)
+  - [[9, 12], 1, Concat, [1]]                   # 13 → C5
 
 head:
   # Reduce to 128 dims
