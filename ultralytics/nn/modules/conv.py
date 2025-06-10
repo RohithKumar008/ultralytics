@@ -921,7 +921,7 @@ import torch.nn.functional as F
 
 class MobileViT(nn.Module):
     def __init__(self, in_channels=512, transformer_dim=192, patch_size=(2, 2), depth=2, num_heads=4):
-        super(SimpleMobileViT, self).__init__()
+        super(MobileViT, self).__init__()
         self.patch_size = patch_size
 
         # 1. Local representation (depthwise + pointwise)
