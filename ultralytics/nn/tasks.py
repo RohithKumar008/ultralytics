@@ -61,6 +61,7 @@ from ultralytics.nn.modules import (
     Add,
     SE,
     CBAM,
+    SAMO,
     LRPCHead,
     Pose,
     RepC3,
@@ -82,6 +83,7 @@ globals()['CondConv'] = CondConv
 globals()['SE'] = SE
 globals()['DeformableConv'] = DeformableConv
 globals()['Add'] = Add
+globals()['SAMO'] = SAMO
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
 from ultralytics.utils.loss import (
@@ -1637,6 +1639,7 @@ def parse_model(d, ch, verbose=True):
             DeformableConv,
             SE,
             CBAM,
+            SAMO,
             Add,
             AddBlock,
             Focus,
