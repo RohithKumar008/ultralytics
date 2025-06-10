@@ -81,6 +81,8 @@ from .conv import (
     DWSConv,
     CondConv,
     DeformableConv,
+    SimpleGate,
+    ECA,
 )
 from .head import (
     OBB,
@@ -125,7 +127,9 @@ __all__ = (
     "SAMO",
     "DWSConv",
     "CondConv",
-    "DeformableConv"
+    "DeformableConv",
+    "ECA",
+    "SimpleGate",
     "Concat",
     "TransformerLayer",
     "TransformerBlock",
