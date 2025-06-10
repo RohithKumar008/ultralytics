@@ -915,36 +915,58 @@ class SimpleGate(nn.Module):
         c = x.shape[1] // 2
         return x[:, :c] * x[:, c:]
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 class MobileViT(nn.Module):
-    def __init__(self, dim, depth=2, patch_size=(2, 4), kernel_size=3):
-        super().__init__()
+    def __init__(self, in_channels=512, transformer_dim=192, patch_size=(2, 2), depth=2, num_heads=4):
+        super(SimpleMobileViT, self).__init__()
+        self.patch_size = patch_size
+
+        # 1. Local representation (depthwise + pointwise)
         self.local_rep = nn.Sequential(
-            nn.Conv2d(dim, dim, kernel_size, padding=kernel_size // 2, groups=dim),
-            nn.Conv2d(dim, dim, kernel_size=1)
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1, groups=in_channels),  # depthwise
+            nn.Conv2d(in_channels, transformer_dim, kernel_size=1),  # pointwise
         )
-        self.transformer = nn.Sequential(*[
-            nn.TransformerEncoderLayer(d_model=dim, nhead=4, batch_first=True)
-            for _ in range(depth)
-        ])
-        if isinstance(patch_size, int):
-            self.patch_size = (patch_size, patch_size)
-        elif isinstance(patch_size, (list, tuple)) and len(patch_size) == 2:
-            self.patch_size = tuple(patch_size)
-        else:
-            raise ValueError(f"Invalid patch_size format: {patch_size}")
+
+        # 2. Transformer Encoder
+        self.transformer = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=transformer_dim, nhead=num_heads, batch_first=True),
+            num_layers=depth
+        )
+
+        # 3. Fusion projection
+        self.fusion = nn.Sequential(
+            nn.Conv2d(transformer_dim, in_channels, kernel_size=1),
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1)
+        )
 
     def forward(self, x):
-        print("Input to MobileViT:", x.shape)
-        y = self.local_rep(x)
-        B, C, H, W = y.shape
-        print("Before reshape:", y.shape)
-        Ph, Pw = self.patch_size
-        y = y.reshape(B, C, H // Ph, Ph, W // Pw, Pw).permute(0, 2, 4, 3, 5, 1).reshape(B, -1, C)
-        y = self.transformer(y)
-        y = y.reshape(B, H // Ph, W // Pw, Ph, Pw, C).permute(0, 5, 1, 3, 2, 4).reshape(B, C, H, W)
-        print("B:", B, "C:", C, "H:", H, "W:", W, "Ph:", Ph, "Pw:", Pw)
-        print("Expected total elements:", B * C * H * W)
-        return x + y
+        print("Input to MobileViT:", x.shape)  # Expecting [B, 512, 4, 4]
+
+        B, C, H, W = x.shape
+        ph, pw = self.patch_size
+
+        # Step 1: Local representation
+        x = self.local_rep(x)  # [B, transformer_dim, 4, 4]
+        print("After local rep:", x.shape)
+
+        # Step 2: Flatten into patches
+        x = x.reshape(B, -1, ph, H // ph, pw, W // pw)  # [B, C, 2, 2, 2, 2]
+        x = x.permute(0, 3, 5, 2, 4, 1)  # [B, H//ph, W//pw, ph, pw, C]
+        x = x.reshape(B * (H // ph) * (W // pw), ph * pw, -1)  # [B*4, 4, transformer_dim]
+
+        # Step 3: Transformer
+        x = self.transformer(x)  # [B*4, 4, transformer_dim]
+
+        # Step 4: Reshape back to image
+        x = x.reshape(B, H // ph, W // pw, ph, pw, -1).permute(0, 5, 1, 3, 2, 4)
+        x = x.reshape(B, -1, H, W)  # [B, transformer_dim, 4, 4]
+
+        # Step 5: Fusion
+        x = self.fusion(x)  # [B, in_channels, 4, 4]
+        return x
 
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
