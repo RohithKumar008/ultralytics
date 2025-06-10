@@ -784,6 +784,7 @@ class CondConv(nn.Module):
             outputs.append(yi)
 
         out = torch.cat(outputs, dim=0)  # (B, c2, H_out, W_out)
+        print("Output of condconv:", out.shape)
         return self.act(self.bn(out))
 
 class SE(nn.Module):
