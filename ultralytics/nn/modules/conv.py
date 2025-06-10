@@ -923,7 +923,12 @@ class MobileViT(nn.Module):
             nn.TransformerEncoderLayer(d_model=dim, nhead=4, batch_first=True)
             for _ in range(depth)
         ])
-        self.patch_size = patch_size
+        if isinstance(patch_size, int):
+            self.patch_size = (patch_size, patch_size)
+        elif isinstance(patch_size, (list, tuple)) and len(patch_size) == 2:
+            self.patch_size = tuple(patch_size)
+        else:
+            raise ValueError(f"Invalid patch_size format: {patch_size}")
 
     def forward(self, x):
         y = self.local_rep(x)
