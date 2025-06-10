@@ -1,53 +1,40 @@
-# efficient_skip_v2.yaml
+# ----------------------
+# Custom Backbone
+# ----------------------
 nc: 3
-depth_multiple: 1.0
-width_multiple: 1.0
-
 backbone:
-  # Stem
-  - [-1, 1, DWSConv, [32, 3, 2]]                # 0
+  # Stem + Stages (DWS, SE, CondConv, etc.)
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: Stem (640 → 320)
+  - [-1, 1, DWSConv, [48, 3, 2]]        # 1: Stage 1 (320 → 160)
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 2: Stage 2 (160 → 80)
+  - [-1, 1, SE, [64]]                    # 3
+  - [-2, 1, DWSConv, [128, 3, 2]]       # 4: Stage 3 (80 → 40)
+  - [-1, 1, SE, [128]]                   # 5 → C3
+  - [-1, 1, CondConv, [256, 3, 2]]      # 6: Stage 4 (40 → 20)
+  - [-1, 1, SE, [256]]                   # 7 → C4
+  - [-1, 1, DWSConv, [512, 3, 2]] # 8: Stage 5 (20 → 10)
+  - [-1, 1, CBAM, [512]]                 # 9
+  - [-1, 1, DWSConv, [512, 3, 1]] # 10: Stage 6 (10 → 10)
+  - [-1, 1, CBAM, [512]]                 # 11 → C5
 
-  # Stage 1
-  - [-1, 1, DWSConv, [48, 3, 2]]                # 1
-  - [-1, 1, SE, [48]]                           # 2 ← replaced SimpleGate
-
-  # Stage 2 (fixed Concat with matching size)
-  - [-1, 1, DWSConv, [64, 3, 2]]                 # 3
-  - [-1, 1, SE, [64]]                            # 4
-  - [2, 1, nn.Upsample, [None, 2, "nearest"]]    # 5 ↑ upsample Stage 1 skip to match Stage 2
-  - [[5, 4], 1, Concat, [1]]                     # 6 ← now both have same size
-
-  # Stage 3
-  - [-1, 1, DWSConv, [128, 3, 2]]               # 6
-  - [-1, 1, CBAM, [128]]                        # 7 → C3
-
-  #stage 4
-  - [-1, 1, DWSConv, [256, 3, 2]]               # 8
-  - [-1, 1, CBAM, [256]]                        # 9
-  - [7, 1, nn.Upsample, [None, 0.5, "nearest"]] # 10 ← downsample C3 to match CBAM output
-  - [[10, 9], 1, Concat, [1]]                   # 11 → C4
-
-#stage 5
-- [-1, 1, DWSConv, [384, 3, 2]]               # 12
-- [-1, 1, SE, [384]]                          # 13
-- [9, 1, nn.Upsample, [None, 0.5, "nearest"]] # 14 ← downsample C4 to match SE output
-- [[14, 13], 1, Concat, [1]]                  # 15 → C5
-
+# ----------------------
+# Neck + Head (Standard FPN)
+# ----------------------
 head:
-  # Reduce to 128 dims
-  - [7, 1, Conv, [128, 1, 1]]                   # 14: C3 → P3
-  - [10, 1, Conv, [128, 1, 1]]                  # 15: C4 → P4
-  - [13, 1, Conv, [128, 1, 1]]                  # 16: C5 → P5
+  # Reduce channels to 128 for all three layers C3, C4, C5
+  - [5, 1, Conv, [128, 1, 1]]          # 12: C3 reduced → p3
+  - [7, 1, Conv, [128, 1, 1]]          # 13: C4 reduced → p4
+  - [11, 1, Conv, [128, 1, 1]]         # 14: C5 reduced → p5
 
-  # P5 → P4 fusion
-  - [16, 1, nn.Upsample, [None, 2, "nearest"]]  # 17
-  - [[15, 17], 1, Concat, [1]]                  # 18
-  - [-1, 1, Conv, [128, 3, 1]]                  # 19
+  # Upsample p5 and concat with p4
+  - [14, 1, nn.Upsample, [None, 2, "nearest"]] # 15: upsample p5
+  - [[13, 15], 1, Concat, [1]]         # 16: concat p4 and upsampled p5
+  - [-1, 1, Conv, [128, 3, 1]]         # 17: fused p4
 
-  # P4 → P3 fusion
-  - [19, 1, nn.Upsample, [None, 2, "nearest"]]  # 20
-  - [[14, 20], 1, Concat, [1]]                  # 21
-  - [-1, 1, Conv, [128, 3, 1]]                  # 22
+  # Upsample fused p4 and concat with p3
+  - [17, 1, nn.Upsample, [None, 2, "nearest"]] # 18: upsample fused p4
+  - [[12, 18], 1, Concat, [1]]         # 19: concat p3 and upsampled p4
+  - [-1, 1, Conv, [128, 3, 1]]         # 20: fused p3
 
-  # Detection
-  - [[22, 19, 16], 1, Detect, [nc]]             # 23
+  # Final Detect layer using p3 (40×40), p4 (20×20), p5 (10×10)
+  - [[20, 17, 14], 1, Detect, [nc]]    # 21: detect heads on P3, P4, P5
