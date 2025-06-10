@@ -11,24 +11,27 @@ backbone:
   - [-1, 1, DWSConv, [48, 3, 2]]                # 1
   - [-1, 1, SE, [48]]                           # 2 ← replaced SimpleGate
 
-  # Stage 2
-  - [-1, 1, DWSConv, [64, 3, 2]]                # 3
-  - [-1, 1, SE, [64]]                           # 4
-  - [[2, 4], 1, Concat, [1]]                    # 5 ← skip from Stage 1
+  # Stage 2 (fixed Concat with matching size)
+  - [-1, 1, DWSConv, [64, 3, 2]]                 # 3
+  - [-1, 1, SE, [64]]                            # 4
+  - [2, 1, nn.Upsample, [None, 2, "nearest"]]    # 5 ↑ upsample Stage 1 skip to match Stage 2
+  - [[5, 4], 1, Concat, [1]]                     # 6 ← now both have same size
 
   # Stage 3
   - [-1, 1, DWSConv, [128, 3, 2]]               # 6
   - [-1, 1, CBAM, [128]]                        # 7 → C3
 
-  # Stage 4
-  - [-1, 1, DWSConv, [256, 3, 2]]               # 8 ← replaced GhostConv
+  #stage 4
+  - [-1, 1, DWSConv, [256, 3, 2]]               # 8
   - [-1, 1, CBAM, [256]]                        # 9
-  - [[7, 9], 1, Concat, [1]]                    # 10 → C4
+  - [7, 1, nn.Upsample, [None, 0.5, "nearest"]] # 10 ← downsample C3 to match CBAM output
+  - [[10, 9], 1, Concat, [1]]                   # 11 → C4
 
-  # Stage 5
-  - [-1, 1, DWSConv, [384, 3, 2]]               # 11
-  - [-1, 1, SE, [384]]                          # 12 ← replaced SimpleGate
-  - [[9, 12], 1, Concat, [1]]                   # 13 → C5
+#stage 5
+- [-1, 1, DWSConv, [384, 3, 2]]               # 12
+- [-1, 1, SE, [384]]                          # 13
+- [9, 1, nn.Upsample, [None, 0.5, "nearest"]] # 14 ← downsample C4 to match SE output
+- [[14, 13], 1, Concat, [1]]                  # 15 → C5
 
 head:
   # Reduce to 128 dims
