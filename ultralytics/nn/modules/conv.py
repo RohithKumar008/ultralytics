@@ -937,30 +937,27 @@ class SimpleGate(nn.Module):
     Splits input along channel dimension and performs element-wise multiplication.
     """
 
-    def __init__(self, channels):
+    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=False):
         """
-        Initialize SimpleGate.
-
         Args:
-            channels (int): Number of input/output channels (must be even).
+            c1 (int): Number of input channels.
+            c2 (int): Number of output channels.
+            k (int): Kernel size.
+            s (int): Stride.
+            p (int, optional): Padding.
+            g (int): Groups.
+            d (int): Dilation.
+            act (bool): Activation (default=False).
         """
         super().__init__()
-        assert channels % 2 == 0, "SimpleGate input channels must be even"
-        self.conv = Conv(channels, channels, k=1, s=1, act=False)
+        assert c2 % 2 == 0, "SimpleGate output channels must be even"
+        self.conv = Conv(c1, c2, k=k, s=s, p=p, g=g, d=d, act=act)
 
     def forward(self, x):
-        """
-        Forward pass of SimpleGate.
-
-        Args:
-            x (torch.Tensor): Input tensor [B, C, H, W].
-
-        Returns:
-            (torch.Tensor): Output tensor.
-        """
         x = self.conv(x)
         c = x.shape[1] // 2
         return x[:, :c] * x[:, c:]
+        
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
 globals()['SE'] = SE
