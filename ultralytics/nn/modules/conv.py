@@ -710,6 +710,7 @@ class DWSConv(nn.Module):
         """
         x = self.depthwise(x)
         x = self.pointwise(x)
+        print("Output of DWSConv:", x.shape)
         return self.act(self.bn(x))
 
 
