@@ -28,6 +28,7 @@ __all__ = (
     "CondConv",
     "SE",
     "DeformableConv",
+    "SAMO",
 )
 
 
@@ -853,8 +854,43 @@ class DeformableConv(nn.Module):
         offset = self.offset_conv(x)
         x = self.deform_conv(x, offset)
         return self.act(self.bn(x))
+        
+class SAMO(nn.Module):
+    """
+    Small Attention Modulation Operator (SAMO).
 
+    Applies a spatial attention mask to emphasize regions likely to contain small objects.
+
+    Attributes:
+        conv (nn.Conv2d): 1×1 convolution to predict attention scores.
+        sigmoid (nn.Sigmoid): Activation function to map scores to [0, 1].
+    """
+
+    def __init__(self, c1):
+        """
+        Initialize SAMO layer.
+
+        Args:
+            c1 (int): Number of input channels.
+        """
+        super().__init__()
+        self.conv = nn.Conv2d(c1, 1, kernel_size=1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        """
+        Forward pass of SAMO.
+
+        Args:
+            x (torch.Tensor): Input feature map of shape [B, C, H, W].
+
+        Returns:
+            torch.Tensor: Modulated feature map.
+        """
+        mask = self.sigmoid(self.conv(x))  # [B, 1, H, W]
+        return x * mask  # Element-wise modulation
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
 globals()['SE'] = SE
 globals()['DeformableConv'] = DeformableConv
+globals()['SAMO'] = SAMO
