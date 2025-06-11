@@ -86,7 +86,9 @@ class Conv(nn.Module):
         Returns:
             (torch.Tensor): Output tensor.
         """
-        return self.act(self.bn(self.conv(x)))
+        out = self.act(self.bn(self.conv(x)))
+        print("Output of Conv(BN):", out.shape)
+        return out
 
     def forward_fuse(self, x):
         """
@@ -98,7 +100,7 @@ class Conv(nn.Module):
         Returns:
             (torch.Tensor): Output tensor.
         """
-        print("Output of DWSConv:", x.shape)
+        print("Output of Conv:", x.shape)
         return self.act(self.conv(x))
 
 
