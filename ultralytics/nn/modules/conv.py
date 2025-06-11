@@ -986,7 +986,9 @@ class DWSConv(nn.Module):
     """Depthwise Separable Conv: depthwise conv followed by pointwise conv"""
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
         super().__init__()
-        self.depthwise = nn.Conv2d(in_channels, in_channels, kernel_size, stride, padding, groups=in_channels, bias=False)
+        self.depthwise = nn.Conv2d(
+            in_channels, in_channels, kernel_size, stride, padding,
+            groups=in_channels, bias=False)
         self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
         self.act = nn.ReLU(inplace=True)
@@ -1001,15 +1003,14 @@ class DWSConv(nn.Module):
 
 class DenseBlock(nn.Module):
     """
-    DenseBlock using DWSConv as the basic layer.
-    Arguments:
-        num_layers: Number of layers inside the block
-        in_channels: Input channels
-        growth_rate: Channels to add per layer
-    Output:
-        Concatenated features from all layers
+    DenseBlock using DWSConv as the basic layer, with final 1x1 Conv to reduce channels.
+    Args:
+        in_channels: input channels
+        out_channels: output channels after 1x1 conv
+        num_layers: number of dense layers inside the block
+        growth_rate: how many channels each layer adds
     """
-    def __init__(self, num_layers, in_channels, growth_rate):
+    def __init__(self, in_channels, out_channels, num_layers=3, growth_rate=16):
         super().__init__()
         self.layers = nn.ModuleList()
         channels = in_channels
@@ -1018,13 +1019,21 @@ class DenseBlock(nn.Module):
                 DWSConv(channels, growth_rate, kernel_size=3, stride=1, padding=1)
             )
             channels += growth_rate
+        # 1x1 conv to reduce channels for next layer
+        self.reduce = nn.Conv2d(channels, out_channels, kernel_size=1, stride=1, bias=False)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.act = nn.ReLU(inplace=True)
 
     def forward(self, x):
         features = [x]
         for layer in self.layers:
             new_feat = layer(torch.cat(features, dim=1))
             features.append(new_feat)
-        return torch.cat(features, dim=1)
+        x = torch.cat(features, dim=1)
+        x = self.reduce(x)
+        x = self.bn(x)
+        x = self.act(x)
+        return x
         
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
