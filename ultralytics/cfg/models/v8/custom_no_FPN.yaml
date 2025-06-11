@@ -3,43 +3,37 @@
 # ----------------------
 nc: 3
 backbone:
-  # Stem + Stages (DWS, SE, CondConv, etc.)
   - [-1, 1, DWSConv, [32, 3, 2]]        # 0: Stem (640 → 320)
   - [-1, 1, DWSConv, [48, 3, 2]]        # 1: Stage 1 (320 → 160)
   - [-1, 1, DWSConv, [64, 3, 2]]        # 2: Stage 2 (160 → 80)
-  - [-1, 1, SE, [64]]                   # 3
-  - [-2, 1, DWSConv, [128, 3, 2]]       # 4: Stage 3 (80 → 40)
-  - [-1, 1, SE, [128]]                  # 5 → C3
-  - [-1, 1, CondConv, [256, 3, 2]]      # 6: Stage 4 (40 → 20)
-  - [-1, 1, SE, [256]]                  # 7 → C4
-  - [-1, 1, DeformableConv, [512, 3, 2]] # 8: Stage 5 (20 → 10)
-  - [-1, 1, CBAM, [512]]                # 9
-  - [-1, 1, DeformableConv, [512, 3, 1]] # 10: Stage 6 (10 → 10)
-  - [-1, 1, CBAM, [512]]                # 11 → C5
+  - [-1, 1, DenseBlock, [64, 3, 16]]    # 3: DenseBlock (3 layers, growth 16)
+  - [-1, 1, DWSConv, [128, 3, 2]]       # 4: Stage 3 (80 → 40)
+  - [-1, 1, DenseBlock, [128, 4, 24]]   # 5: DenseBlock (4 layers, growth 24)
+  - [-1, 1, CondConv, [256, 3, 2]]      # 6(C4): Stage 4 (40 → 20)
+  # - [-1, 1, SE, [256]]                  # 7 → C4
+  - [-1, 1, DWSConv, [512, 3, 2]]       # 7: Stage 5 (20 → 10)
+  - [-1, 1, CBAM, [512]]                # 8
+  - [-1, 1, DWSConv, [512, 3, 1]]       # 9 -> C5
+  # - [-1, 1, CBAM, [512]]                # 11 → C5
 
 # ----------------------
-# Head (Direct Detection without FPN)
+# Neck + Head (Standard FPN)
 # ----------------------
 head:
-  # Upsample and concat features
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 12: Upsample from last layer by 2
-  - [[-1, 6], 1, Concat, [1]]                   # 13: Concat with backbone layer 6 (P4)
-  - [-1, 3, C2f, [512]]                         # 14: Process concat output
+  # Reduce channels to 128 for all three layers C3, C4, C5
+  - [5, 1, Conv, [128, 1, 1]]          # 10: C3 reduced → p3
+  - [6, 1, Conv, [128, 1, 1]]          # 11: C4 reduced → p4
+  - [9, 1, Conv, [128, 1, 1]]         # 12: C5 reduced → p5
 
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 15: Upsample again
-  - [[-1, 4], 1, Concat, [1]]                   # 16: Concat with backbone layer 4 (P3)
-  - [-1, 3, C2f, [256]]                         # 17: Process concat output (small scale head)
+  # Upsample p5 and concat with p4
+  - [12, 1, nn.Upsample, [None, 2, "nearest"]] # 13: upsample p5
+  - [[11, 13], 1, Concat, [1]]         # 14: concat p4 and upsampled p5
+  - [-1, 1, Conv, [128, 3, 1]]         # 15: fused p4
 
-  # Downsample and concat for medium scale
-  - [-1, 1, Conv, [256, 3, 2]]                  # 18: Downsample
-  - [[-1, 12], 1, Concat, [1]]                  # 19: Concat with previous layer 12
-  - [-1, 3, C2f, [512]]                         # 20: Process concat output (medium scale head)
+  # Upsample fused p4 and concat with p3
+  - [15, 1, nn.Upsample, [None, 2, "nearest"]] # 16: upsample fused p4
+  - [[10, 16], 1, Concat, [1]]         # 17: concat p3 and upsampled p4
+  - [-1, 1, Conv, [128, 3, 1]]         # 19: fused p3
 
-  # Downsample and concat for large scale
-  - [-1, 1, Conv, [512, 3, 2]]                  # 21: Downsample
-  - [[-1, 9], 1, Concat, [1]]                   # 22: Concat with previous layer 9
-  - [-1, 3, C2f, [1024]]                        # 23: Process concat output (large scale head)
-
-  # Final detection heads on P3, P4, P5
-  - [[14, 17, 20], 1, Detect, [nc]]             # 24: Detect on outputs of C2f blocks
-
+  # Final Detect layer using p3 (40×40), p4 (19×19), p5 (10×10)
+  - [[19, 15, 12], 1, Detect, [nc]]    # 20: detect heads on P3, P4, P5
