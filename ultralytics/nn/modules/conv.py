@@ -981,21 +981,19 @@ class MobileViT(nn.Module):
         
 class DenseBlock(nn.Module):
     def __init__(self, c1, c2, num_layers, growth_rate):
-        """
-        c1: Input channels
-        c2: Not used (just passed for Ultralytics compatibility)
-        num_layers: Number of DWSConv layers
-        growth_rate: Output channels added per layer
-        """
         super().__init__()
         self.layers = nn.ModuleList()
-        channels = c1
-        for _ in range(num_layers):
+        self.growth_rate = growth_rate
+        self.num_layers = num_layers
+        self.initial_channels = c1
+
+        for i in range(num_layers):
+            in_ch = c1 + i * growth_rate  # dynamic input channels
             self.layers.append(
-                DWSConv(channels, growth_rate, k=3, s=1, p=1)
+                DWSConv(in_ch, growth_rate, k=3, s=1, p=1)
             )
-            channels += growth_rate
-        self.out_channels = channels  # for Ultralytics compatibility
+
+        self.out_channels = c1 + num_layers * growth_rate
 
     def forward(self, x):
         features = [x]
