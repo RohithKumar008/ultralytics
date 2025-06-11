@@ -87,7 +87,7 @@ class Conv(nn.Module):
             (torch.Tensor): Output tensor.
         """
         out = self.act(self.bn(self.conv(x)))
-        print("Output of Conv(BN):", out.shape)
+        # print("Output of Conv(BN):", out.shape)
         return out
 
     def forward_fuse(self, x):
@@ -100,7 +100,7 @@ class Conv(nn.Module):
         Returns:
             (torch.Tensor): Output tensor.
         """
-        print("Output of Conv:", x.shape)
+        # print("Output of Conv:", x.shape)
         return self.act(self.conv(x))
 
 
@@ -713,8 +713,9 @@ class DWSConv(nn.Module):
         """
         x = self.depthwise(x)
         x = self.pointwise(x)
-        print("Output of DWSConv:", x.shape)
-        return self.act(self.bn(x))
+        out = self.act(self.bn(x))
+        print("Output of DWSConv:", out.shape)
+        return out
 
 
 class CondConv(nn.Module):
@@ -786,8 +787,9 @@ class CondConv(nn.Module):
             outputs.append(yi)
 
         out = torch.cat(outputs, dim=0)  # (B, c2, H_out, W_out)
+        out = self.act(self.bn(out))
         print("Output of condconv:", out.shape)
-        return self.act(self.bn(out))
+        return out
 
 class SE(nn.Module):
     """
@@ -806,7 +808,9 @@ class SE(nn.Module):
         )
 
     def forward(self, x):
-        return x * self.fc(self.pool(x))
+        out = x * self.fc(self.pool(x))
+        print("SE output : ",out.shape)
+        return out
 
 
 class DeformableConv(nn.Module):
@@ -830,7 +834,9 @@ class DeformableConv(nn.Module):
     def forward(self, x):
         offset = self.offset_conv(x)
         x = self.deform_conv(x, offset)
-        return self.act(self.bn(x))
+        out = self.act(self.bn(x))
+        print("deformable conv shape :",out.shape)
+        return out
         
 class SAMO(nn.Module):
     """
@@ -915,7 +921,8 @@ class SimpleGate(nn.Module):
     def forward(self, x):
         x = self.conv(x)
         c = x.shape[1] // 2
-        return x[:, :c] * x[:, c:]
+        out = x[:, :c] * x[:, c:]
+        return out
 
 import torch
 import torch.nn as nn
