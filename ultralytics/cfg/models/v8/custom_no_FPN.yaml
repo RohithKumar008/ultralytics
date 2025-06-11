@@ -33,7 +33,7 @@ head:
   # Upsample fused p4 and concat with p3
   - [15, 1, nn.Upsample, [None, 2, "nearest"]] # 16: upsample fused p4
   - [[10, 16], 1, Concat, [1]]         # 17: concat p3 and upsampled p4
-  - [-1, 1, Conv, [128, 3, 1]]         # 19: fused p3
+  - [-1, 1, Conv, [128, 3, 1]]         # 18: fused p3
 
-  # Final Detect layer using p3 (40×40), p4 (19×19), p5 (10×10)
-  - [[19, 15, 12], 1, Detect, [nc]]    # 20: detect heads on P3, P4, P5
+  # Final Detect layer using p3 (40×40), p4 (20×20), p5 (10×10)
+  - [[18, 15, 12], 1, Detect, [nc]]    # 20: detect heads on P3, P4, P5
