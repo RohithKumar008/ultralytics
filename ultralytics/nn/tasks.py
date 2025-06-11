@@ -56,6 +56,7 @@ from ultralytics.nn.modules import (
     ImagePoolingAttn,
     Index,
     DWSConv,
+    DenseBlock,
     CondConv,
     DeformableConv,
     SimpleGate,
@@ -82,6 +83,7 @@ from ultralytics.nn.modules import (
     v10Detect,
 )
 globals()['DWSConv'] = DWSConv
+globals()['DenseBlock'] = DenseBlock
 globals()['CondConv'] = CondConv
 globals()['SE'] = SE
 globals()['DeformableConv'] = DeformableConv
@@ -1641,6 +1643,7 @@ def parse_model(d, ch, verbose=True):
             C2PSA,
             DWConv,
             DWSConv,
+            DenseBlock,
             CondConv,
             DeformableConv,
             SE,
