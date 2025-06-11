@@ -669,54 +669,6 @@ class Index(nn.Module):
         return x[self.index]
 
 
-# class DWSConv(nn.Module):
-#     """
-#     Depthwise Separable Convolution with BatchNorm and Activation.
-    
-#     Attributes:
-#         depthwise (nn.Conv2d): Depthwise convolution layer.
-#         pointwise (nn.Conv2d): Pointwise convolution layer.
-#         bn (nn.BatchNorm2d): Batch normalization.
-#         act (nn.Module): Activation function.
-#         default_act (nn.Module): Default activation (SiLU).
-#     """
-
-#     default_act = nn.SiLU()
-
-#     def __init__(self, c1, c2, k=3, s=1, p=None, d=1, act=True):
-#         """
-#         Initialize the DWSConv layer.
-        
-#         Args:
-#             c1 (int): Input channels.
-#             c2 (int): Output channels.
-#             k (int): Kernel size.
-#             s (int): Stride.
-#             p (int, optional): Padding. Defaults to autopad.
-#             d (int): Dilation.
-#             act (bool | nn.Module): Activation type.
-#         """
-#         super().__init__()
-#         self.depthwise = nn.Conv2d(c1, c1, k, s, autopad(k, p, d), groups=c1, dilation=d, bias=False)
-#         self.pointwise = nn.Conv2d(c1, c2, 1, bias=False)
-#         self.bn = nn.BatchNorm2d(c2)
-#         self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
-
-#     def forward(self, x):
-#         """
-#         Forward pass applying depthwise → pointwise → BN → activation.
-        
-#         Args:
-#             x (torch.Tensor): Input tensor.
-        
-#         Returns:
-#             torch.Tensor: Output tensor.
-#         """
-#         x = self.depthwise(x)
-#         x = self.pointwise(x)
-#         out = self.act(self.bn(x))
-#         print("Output of DWSConv:", out.shape)
-#         return out
 
 
 class CondConv(nn.Module):
@@ -789,7 +741,7 @@ class CondConv(nn.Module):
 
         out = torch.cat(outputs, dim=0)  # (B, c2, H_out, W_out)
         out = self.act(self.bn(out))
-        print("Output of condconv:", out.shape)
+        # print("Output of condconv:", out.shape)
         return out
 
 class SE(nn.Module):
@@ -810,7 +762,7 @@ class SE(nn.Module):
 
     def forward(self, x):
         out = x * self.fc(self.pool(x))
-        print("SE output : ",out.shape)
+        # print("SE output : ",out.shape)
         return out
 
 
@@ -836,7 +788,7 @@ class DeformableConv(nn.Module):
         offset = self.offset_conv(x)
         x = self.deform_conv(x, offset)
         out = self.act(self.bn(x))
-        print("deformable conv shape :",out.shape)
+        # print("deformable conv shape :",out.shape)
         return out
         
 class SAMO(nn.Module):
@@ -998,7 +950,7 @@ class DWSConv(nn.Module):
         x = self.pointwise(x)
         x = self.bn(x)
         x = self.act(x)
-        print("DWS conv output : ",x.shape)
+        # print("DWS conv output : ",x.shape)
         return x
 
 class DenseBlock(nn.Module):
