@@ -669,54 +669,54 @@ class Index(nn.Module):
         return x[self.index]
 
 
-class DWSConv(nn.Module):
-    """
-    Depthwise Separable Convolution with BatchNorm and Activation.
+# class DWSConv(nn.Module):
+#     """
+#     Depthwise Separable Convolution with BatchNorm and Activation.
     
-    Attributes:
-        depthwise (nn.Conv2d): Depthwise convolution layer.
-        pointwise (nn.Conv2d): Pointwise convolution layer.
-        bn (nn.BatchNorm2d): Batch normalization.
-        act (nn.Module): Activation function.
-        default_act (nn.Module): Default activation (SiLU).
-    """
+#     Attributes:
+#         depthwise (nn.Conv2d): Depthwise convolution layer.
+#         pointwise (nn.Conv2d): Pointwise convolution layer.
+#         bn (nn.BatchNorm2d): Batch normalization.
+#         act (nn.Module): Activation function.
+#         default_act (nn.Module): Default activation (SiLU).
+#     """
 
-    default_act = nn.SiLU()
+#     default_act = nn.SiLU()
 
-    def __init__(self, c1, c2, k=3, s=1, p=None, d=1, act=True):
-        """
-        Initialize the DWSConv layer.
+#     def __init__(self, c1, c2, k=3, s=1, p=None, d=1, act=True):
+#         """
+#         Initialize the DWSConv layer.
         
-        Args:
-            c1 (int): Input channels.
-            c2 (int): Output channels.
-            k (int): Kernel size.
-            s (int): Stride.
-            p (int, optional): Padding. Defaults to autopad.
-            d (int): Dilation.
-            act (bool | nn.Module): Activation type.
-        """
-        super().__init__()
-        self.depthwise = nn.Conv2d(c1, c1, k, s, autopad(k, p, d), groups=c1, dilation=d, bias=False)
-        self.pointwise = nn.Conv2d(c1, c2, 1, bias=False)
-        self.bn = nn.BatchNorm2d(c2)
-        self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
+#         Args:
+#             c1 (int): Input channels.
+#             c2 (int): Output channels.
+#             k (int): Kernel size.
+#             s (int): Stride.
+#             p (int, optional): Padding. Defaults to autopad.
+#             d (int): Dilation.
+#             act (bool | nn.Module): Activation type.
+#         """
+#         super().__init__()
+#         self.depthwise = nn.Conv2d(c1, c1, k, s, autopad(k, p, d), groups=c1, dilation=d, bias=False)
+#         self.pointwise = nn.Conv2d(c1, c2, 1, bias=False)
+#         self.bn = nn.BatchNorm2d(c2)
+#         self.act = self.default_act if act is True else act if isinstance(act, nn.Module) else nn.Identity()
 
-    def forward(self, x):
-        """
-        Forward pass applying depthwise → pointwise → BN → activation.
+#     def forward(self, x):
+#         """
+#         Forward pass applying depthwise → pointwise → BN → activation.
         
-        Args:
-            x (torch.Tensor): Input tensor.
+#         Args:
+#             x (torch.Tensor): Input tensor.
         
-        Returns:
-            torch.Tensor: Output tensor.
-        """
-        x = self.depthwise(x)
-        x = self.pointwise(x)
-        out = self.act(self.bn(x))
-        print("Output of DWSConv:", out.shape)
-        return out
+#         Returns:
+#             torch.Tensor: Output tensor.
+#         """
+#         x = self.depthwise(x)
+#         x = self.pointwise(x)
+#         out = self.act(self.bn(x))
+#         print("Output of DWSConv:", out.shape)
+#         return out
 
 
 class CondConv(nn.Module):
@@ -979,30 +979,52 @@ class MobileViT(nn.Module):
         x = self.fusion(x)  # [B, in_channels, 4, 4]
         return x
         
+import torch
+import torch.nn as nn
+
+class DWSConv(nn.Module):
+    """Depthwise Separable Conv: depthwise conv followed by pointwise conv"""
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+        super().__init__()
+        self.depthwise = nn.Conv2d(in_channels, in_channels, kernel_size, stride, padding, groups=in_channels, bias=False)
+        self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, bias=False)
+        self.bn = nn.BatchNorm2d(out_channels)
+        self.act = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        x = self.depthwise(x)
+        x = self.pointwise(x)
+        x = self.bn(x)
+        x = self.act(x)
+        print("DWS conv output : ",x.shape)
+        return x
+
 class DenseBlock(nn.Module):
-    def __init__(self, c1, c2, num_layers, growth_rate):
+    """
+    DenseBlock using DWSConv as the basic layer.
+    Arguments:
+        num_layers: Number of layers inside the block
+        in_channels: Input channels
+        growth_rate: Channels to add per layer
+    Output:
+        Concatenated features from all layers
+    """
+    def __init__(self, num_layers, in_channels, growth_rate):
         super().__init__()
         self.layers = nn.ModuleList()
-        self.growth_rate = growth_rate
-        self.num_layers = num_layers
-        self.initial_channels = c1
-
-        for i in range(num_layers):
-            in_ch = c1 + i * growth_rate  # dynamic input channels
+        channels = in_channels
+        for _ in range(num_layers):
             self.layers.append(
-                DWSConv(in_ch, growth_rate, k=3, s=1, p=1)
+                DWSConv(channels, growth_rate, kernel_size=3, stride=1, padding=1)
             )
-
-        self.out_channels = c1 + num_layers * growth_rate
+            channels += growth_rate
 
     def forward(self, x):
         features = [x]
         for layer in self.layers:
             new_feat = layer(torch.cat(features, dim=1))
             features.append(new_feat)
-        out = torch.cat(features, dim=1)
-        print("dense layer output:", out.shape)
-        return out
+        return torch.cat(features, dim=1)
         
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
