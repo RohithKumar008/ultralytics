@@ -32,6 +32,7 @@ __all__ = (
     "ECA",
     "SimpleGate",
     "MobileViT",
+    "DenseBlock",
 )
 
 
@@ -977,11 +978,41 @@ class MobileViT(nn.Module):
         # Step 5: Fusion
         x = self.fusion(x)  # [B, in_channels, 4, 4]
         return x
+        
+class DenseBlock(nn.Module):
+    """
+    DenseBlock using DWSConv as the basic layer.
+    Arguments:
+        num_layers: Number of layers inside the block
+        in_channels: Input channels
+        growth_rate: Channels to add per layer
+    Output:
+        Concatenated features from all layers
+    """
+    def __init__(self, num_layers, in_channels, growth_rate):
+        super().__init__()
+        self.layers = nn.ModuleList()
+        channels = in_channels
+        for _ in range(num_layers):
+            self.layers.append(
+                DWSConv(channels, growth_rate, kernel_size=3, stride=1, padding=1)
+            )
+            channels += growth_rate
 
+    def forward(self, x):
+        features = [x]
+        for layer in self.layers:
+            new_feat = layer(torch.cat(features, dim=1))
+            features.append(new_feat)
+            out = torch.cat(features, dim=1)
+            print("dense layer output : ",out.shape)
+        return out
+        
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
 globals()['SE'] = SE
 globals()['DeformableConv'] = DeformableConv
+globals()['DenseBlock'] = DenseBlock
 globals()['SAMO'] = SAMO
 globals()['ECA'] = ECA
 globals()['SimpleGate'] = SimpleGate
