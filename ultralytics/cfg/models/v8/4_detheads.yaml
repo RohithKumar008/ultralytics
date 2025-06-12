@@ -1,47 +1,42 @@
-# ----------------------
-# Custom Backbone
-# ----------------------
 nc: 3
 backbone:
-  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: Stem
-  - [-1, 1, DWSConv, [48, 3, 2]]        # 1: Stage 1
-  - [-1, 1, DWSConv, [64, 3, 2]]        # 2: Stage 2
-  - [-1, 1, SE, [64]]                   # 3 → P2 source
-  - [-2, 1, DWSConv, [128, 3, 2]]       # 4: Stage 3
-  - [-1, 1, SE, [128]]                  # 5 → C3
-  - [-1, 1, CondConv, [256, 3, 2]]      # 6: Stage 4
-  - [-1, 1, SE, [256]]                  # 7 → C4
-  - [-1, 1, DeformableConv, [512, 3, 2]] # 8: Stage 5
-  - [-1, 1, CBAM, [512]]                # 9
-  - [-1, 1, DeformableConv, [512, 3, 1]] # 10: Stage 6
-  - [-1, 1, CBAM, [512]]                # 11 → C5
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: Stem (640 → 320)
+  - [-1, 1, DWSConv, [48, 3, 2]]        # 1: Stage 1 (320 → 160)
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 2: Stage 2 (160 → 80)
+  - [-1, 1, DenseBlock, [64, 3, 16]]    # 3: DenseBlock (3 layers, growth 16) -> P2
+  - [-1, 1, DWSConv, [128, 3, 2]]       # 4: Stage 3 (80 → 40)
+  - [-1, 1, DenseBlock, [128, 4, 24]]   # 5: DenseBlock (4 layers, growth 24)
+  - [-1, 1, CondConv, [256, 3, 2]]      # 6(C4): Stage 4 (40 → 20)
+  # - [-1, 1, SE, [256]]                  # 7 → C4
+  - [-1, 1, DWSConv, [512, 3, 2]]       # 7: Stage 5 (20 → 10)
+  # - [-1, 1, CBAM, [512]]                # 8
+  - [-1, 1, DWSConv, [512, 3, 1]]       # 8 -> C5
+  # - [-1, 1, CBAM, [512]]                # 11 → C5
 
 # ----------------------
-# Neck + Head (Enhanced FPN with P2)
+# Neck + Head (Standard FPN)
 # ----------------------
 head:
-  # Reduce SE[64] (from #3) to 128 channels → P2
-  - [3, 1, Conv, [128, 1, 1]]          # 12: reduced P2
+  # Reduce channels to 128 for all three layers C3, C4, C5
+  - [3, 1, Conv, [128, 1, 1]]          # 9: reduced P2
+  - [5, 1, Conv, [128, 1, 1]]          # 10: C3 reduced → p3
+  - [6, 1, Conv, [128, 1, 1]]          # 11: C4 reduced → p4
+  - [8, 1, Conv, [128, 1, 1]]         # 12: C5 reduced → p5
 
-  # Reduce channels of C3, C4, C5
-  - [5, 1, Conv, [128, 1, 1]]          # 13: C3 → p3
-  - [7, 1, Conv, [128, 1, 1]]          # 14: C4 → p4
-  - [11, 1, Conv, [128, 1, 1]]         # 15: C5 → p5
+  # Upsample p5 and concat with p4
+  - [12, 1, nn.Upsample, [None, 2, "nearest"]] # 13: upsample p5
+  - [[11, 13], 1, Concat, [1]]         # 14: concat p4 and upsampled p5
+  - [-1, 1, Conv, [128, 3, 1]]         # 15: fused p4
 
-  # Upsample p5 → concat with p4 → fuse p4
-  - [15, 1, nn.Upsample, [None, 2, "nearest"]] # 16
-  - [[14, 16], 1, Concat, [1]]         # 17
-  - [-1, 1, Conv, [128, 3, 1]]         # 18: fused p4
+  # Upsample fused p4 and concat with p3
+  - [15, 1, nn.Upsample, [None, 2, "nearest"]] # 16: upsample fused p4
+  - [[10, 16], 1, Concat, [1]]         # 17: concat p3 and upsampled p4
+  - [-1, 1, Conv, [128, 3, 1]]         # 18: fused p3
 
-  # Upsample fused p4 → concat with p3 → fuse p3
-  - [18, 1, nn.Upsample, [None, 2, "nearest"]] # 19
-  - [[13, 19], 1, Concat, [1]]         # 20
-  - [-1, 1, Conv, [128, 3, 1]]         # 21: fused p3
-
-  # Upsample fused p3 → concat with p2 → fuse p2
-  - [21, 1, nn.Upsample, [None, 2, "nearest"]] # 22
-  - [[12, 22], 1, Concat, [1]]         # 23
-  - [-1, 1, Conv, [128, 3, 1]]         # 24: fused p2
-
-  # Final detect head on [P2, P3, P4, P5]
-  - [[24, 21, 18, 15], 1, Detect, [nc]] # 25: Detect on P2, P3, P4, P5
+  #upsample fused P3 and concat with P2
+  - [18, 1, nn.Upsample, [None, 2, "nearest"]] # 19: upsample fused p3
+  - [[9, 19], 1, Concat, [1]]         # 20: concat p2 and upsampled p3
+  - [-1, 1, Conv, [128, 3, 1]]         # 21: fused p2
+  
+  # Final Detect layer using p2 (80x80), p3 (40×40), p4 (20×20), p5 (10×10)
+  - [[21, 18, 15, 12], 1, Detect, [nc]]    # 18: detect heads on P3, P4, P5
