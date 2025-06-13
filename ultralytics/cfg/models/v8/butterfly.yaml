@@ -18,7 +18,7 @@ backbone:
 # ----------------------
 # Neck + Head (Standard FPN)
 # ----------------------
-neck:
+head :
   # ===== Left Stem =====
   - [3, 1, Conv, [128, 1, 1]]         # 11: P3_left
   - [7, 1, Conv, [128, 1, 1]]         # 12: P1_left
