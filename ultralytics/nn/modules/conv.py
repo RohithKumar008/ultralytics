@@ -755,7 +755,7 @@ class SE(nn.Module):
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
             nn.Conv2d(c1, c_, 1, bias=False),
-            nn.ReLU(inplace=True),
+            nn.SiLU(inplace=True),
             nn.Conv2d(c_, c1, 1, bias=False),
             nn.Sigmoid()
         )
@@ -943,7 +943,7 @@ class DWSConv(nn.Module):
             groups=in_channels, bias=False)
         self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
-        self.act = nn.ReLU(inplace=True)
+        self.act = nn.SiLU(inplace=True)
 
     def forward(self, x):
         x = self.depthwise(x)
@@ -974,7 +974,7 @@ class DenseBlock(nn.Module):
         # 1x1 conv to reduce channels for next layer
         self.reduce = nn.Conv2d(channels, out_channels, kernel_size=1, stride=1, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
-        self.act = nn.ReLU(inplace=True)
+        self.act = nn.SiLU(inplace=True)
 
     def forward(self, x):
         features = [x]
