@@ -944,12 +944,14 @@ class DWSConv(nn.Module):
         self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
         self.act = nn.SiLU(inplace=True)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
     def forward(self, x):
         x = self.depthwise(x)
         x = self.pointwise(x)
         x = self.bn(x)
         x = self.act(x)
+        x = self.pool(x)
         # print("DWS conv output : ",x.shape)
         return x
 
