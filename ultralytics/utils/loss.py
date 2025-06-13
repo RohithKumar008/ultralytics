@@ -200,7 +200,8 @@ class v8DetectionLoss:
         h = model.args  # hyperparameters
 
         m = model.model[-1]  # Detect() module
-        self.bce = FocalLoss(gamma=2.0, alpha=0.25)
+        alpha = torch.tensor([0.484, 0.044, 0.471])  # same order as your class indices
+        self.bce = FocalLoss(gamma=2.0, alpha=alpha)
         self.hyp = h
         self.stride = m.stride  # model strides
         self.nc = m.nc  # number of classes
