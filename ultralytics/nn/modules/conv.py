@@ -944,7 +944,7 @@ class DWSConv(nn.Module):
         self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
         self.act = nn.SiLU(inplace=True)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        # self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
     def forward(self, x):
         x = self.depthwise(x)
@@ -965,7 +965,7 @@ class DWSdenseConv(nn.Module):
         self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, bias=False)
         self.bn = nn.BatchNorm2d(out_channels)
         self.act = nn.SiLU(inplace=True)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        # self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
     def forward(self, x):
         x = self.depthwise(x)
