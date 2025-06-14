@@ -951,7 +951,7 @@ class DWSConv(nn.Module):
         x = self.pointwise(x)
         x = self.bn(x)
         x = self.act(x)
-        x = self.pool(x)
+        # x = self.pool(x)
         # print("DWS conv output : ",x.shape)
         return x
 
