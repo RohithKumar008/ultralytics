@@ -1,0 +1,39 @@
+# ----------------------
+# Custom Backbone
+# ----------------------
+nc: 3
+backbone:
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: Stem (640 → 320)
+  - [-1, 1, DWSConv, [48, 3, 2]]        # 1: Stage 1 (320 → 160)
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 2: Stage 2 (160 → 80)
+  - [-1, 1, DenseBlock, [64, 3, 16]]    # 3: DenseBlock (3 layers, growth 16)
+  - [-1, 1, DWSConv, [128, 3, 2]]       # 4: Stage 3 (80 → 40)
+  - [-1, 1, DenseBlock, [128, 4, 24]]   # 5: DenseBlock (4 layers, growth 24)
+  - [-1, 1, CondConv, [256, 3, 2]]      # 6(C4): Stage 4 (40 → 20)
+  # - [-1, 1, SE, [256]]                  # 7 → C4
+  - [-1, 1, DWSConv, [512, 3, 2]]       # 7: Stage 5 (20 → 10)
+  # - [-1, 1, CBAM, [512]]                # 8
+  - [-1, 1, DWSConv, [512, 3, 1]]       # 8 -> C5
+  # - [-1, 1, CBAM, [512]]                # 11 → C5
+
+# ----------------------
+# Neck + Head (Standard FPN)
+# ----------------------
+head:
+  # Reduce channels to 128 for all three layers C3, C4, C5
+  - [5, 1, Conv, [128, 1, 1]]          # 9: C3 reduced → p3
+  - [6, 1, Conv, [128, 1, 1]]          # 10: C4 reduced → p4
+  - [8, 1, Conv, [128, 1, 1]]         # 11: C5 reduced → p5
+
+  # Upsample p5 and concat with p4
+  - [11, 1, nn.Upsample, [None, 2, "nearest"]] # 12: upsample p5
+  - [[10, 12], 1, Concat, [1]]         # 13: concat p4 and upsampled p5
+  - [-1, 1, Conv, [128, 3, 1]]         # 14: fused p4
+
+  # Upsample fused p4 and concat with p3
+  - [14, 1, nn.Upsample, [None, 2, "nearest"]] # 15: upsample fused p4
+  - [[9, 15], 1, Concat, [1]]         # 16: concat p3 and upsampled p4
+  - [-1, 1, Conv, [128, 3, 1]]         # 17: fused p3
+
+  # Final Detect layer using p3 (40×40), p4 (20×20), p5 (10×10)
+  - [[17, 14, 11], 1, RTDETRDecoder, [nc]]    # 18: detect heads on P3, P4, P5
