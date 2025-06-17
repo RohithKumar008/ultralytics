@@ -828,7 +828,7 @@ class SAMO(nn.Module):
 
 class DWSConv(nn.Module):
     """Depthwise Separable Conv: depthwise conv followed by pointwise conv"""
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=2, padding=1):
         super().__init__()
         self.depthwise = nn.Conv2d(
             in_channels, in_channels, kernel_size, stride, padding,
@@ -983,7 +983,85 @@ class CEMBlock(nn.Module):
         b3 = self.branch3(x)
         out = torch.cat([b1, b2, b3], dim=1)
         return self.project(out)
-        
+import torch
+import torch.nn as nn
+from einops import rearrange
+
+class MLP(nn.Module):
+    def __init__(self, dim, hidden_dim=None):
+        super().__init__()
+        hidden_dim = hidden_dim or dim * 4
+        self.fc = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, dim)
+        )
+
+    def forward(self, x):
+        return self.fc(x)
+
+class WindowAttention(nn.Module):
+    def __init__(self, dim, window_size=7, num_heads=4):
+        super().__init__()
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+        self.scale = self.head_dim ** -0.5
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=True)
+        self.proj = nn.Linear(dim, dim)
+
+    def forward(self, x):
+        B, N, C = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv[0], qkv[1], qkv[2]
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        out = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        return self.proj(out)
+
+class SwinFusionBlock(nn.Module):
+    """Swin-based Transformer Fusion Block: local window attention + identity fusion"""
+    def __init__(self, in_channels, window_size=7, num_heads=4):
+        super(SwinFusionBlock, self).__init__()
+        self.in_channels = in_channels
+        self.window_size = window_size
+
+        self.norm1 = nn.LayerNorm(in_channels)
+        self.attn = WindowAttention(in_channels, window_size, num_heads)
+        self.norm2 = nn.LayerNorm(in_channels)
+        self.mlp = MLP(in_channels)
+
+        self.fuse = nn.Conv2d(in_channels * 2, in_channels, kernel_size=1)
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        y = x.clone()
+
+        # Pad input to be divisible by window size
+        pad_h = (self.window_size - H % self.window_size) % self.window_size
+        pad_w = (self.window_size - W % self.window_size) % self.window_size
+        x = nn.functional.pad(x, (0, pad_w, 0, pad_h))
+        Hp, Wp = x.shape[2], x.shape[3]
+
+        # Partition into non-overlapping windows
+        x = rearrange(x, 'b c (h ws1) (w ws2) -> (b h w) (ws1 ws2) c',
+                      ws1=self.window_size, ws2=self.window_size)
+
+        # Swin Transformer Block
+        x = self.norm1(x)
+        x = x + self.attn(x)
+        x = x + self.mlp(self.norm2(x))
+
+        # Reconstruct spatial layout
+        x = rearrange(x, '(b h w) (ws1 ws2) c -> b c (h ws1) (w ws2)',
+                      b=B, h=Hp // self.window_size, w=Wp // self.window_size,
+                      ws1=self.window_size, ws2=self.window_size, c=C)
+        x = x[:, :, :H, :W]  # Remove padding if any
+
+        # Fusion with original identity
+        out = self.fuse(torch.cat([x, y], dim=1))
+        return out
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
 globals()['SE'] = SE
@@ -993,5 +1071,6 @@ globals()['SAMO'] = SAMO
 globals()['EfficientBlock'] = EfficientBlock
 globals()['MiniC2f'] = MiniC2f
 globals()['CEMBlock'] = CEMBlock
+globals()['SwinFusionBlock'] = SwinFusionBlock
 
 
