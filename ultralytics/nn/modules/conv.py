@@ -33,6 +33,7 @@ __all__ = (
     "EfficientBlock",
     "MiniC2f",
     "CEMBlock",
+    "SwinFusionBlock",
 )
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
