@@ -829,7 +829,7 @@ class SAMO(nn.Module):
 
 class DWSConv(nn.Module):
     """Depthwise Separable Conv: depthwise conv followed by pointwise conv"""
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=2, padding=1):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
         super().__init__()
         self.depthwise = nn.Conv2d(
             in_channels, in_channels, kernel_size, stride, padding,
