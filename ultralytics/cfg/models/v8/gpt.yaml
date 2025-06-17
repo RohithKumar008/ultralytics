@@ -6,12 +6,12 @@ backbone:
   - [-1, 1, DWSConv, [64, 3, 2]]
   - [-1, 2, EfficientBlock, [64]]
   - [-1, 1, DWSConv, [128, 3, 2]]
-  - [-1, 1, C2f, [128, 256, 1]]      # Replaced MiniC2f
+  - [-1, 1, C2f, [256, True]]      # ← Replaces MiniC2f
   - [-1, 1, DWSConv, [256, 3, 2]]
-  - [-1, 1, C2f, [256, 512, 1]]      # Replaced MiniC2f
+  - [-1, 1, C2f, [512, True]]      # ← Replaces MiniC2f
   - [-1, 1, CEMBlock, [512]]
   - [-1, 1, DWSConv, [1024, 3, 2]]
-  - [-1, 1, C2f, [1024, 1024, 1]]    # Replaced MiniC2f
+  - [-1, 1, C2f, [1024, True]]     # ← Replaces MiniC2f
 
 head:
   - [6, 1, Conv, [256, 1, 1]]
