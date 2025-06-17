@@ -29,12 +29,11 @@ __all__ = (
     "SE",
     "DeformableConv",
     "SAMO",
-    "ECA",
-    "SimpleGate",
-    "MobileViT",
     "DenseBlock",
+    "EfficientBlock",
+    "MiniC2f",
+    "CEMBlock",
 )
-
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
     """Pad to 'same' shape outputs."""
@@ -827,113 +826,6 @@ class SAMO(nn.Module):
         mask = self.sigmoid(self.conv(x))  # [B, 1, H, W]
         return x * mask  # Broadcasted element-wise modulation
 
-import torch
-import torch.nn as nn
-
-class ECA(nn.Module):
-    """
-    Efficient Channel Attention (ECA) module.
-    """
-
-    def __init__(self, c1, c2=None, k_size=3):  # c2 is ignored, kept for compatibility
-        super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=k_size // 2, bias=False)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        y = self.avg_pool(x)             # [B, C, 1, 1]
-        y = y.squeeze(-1).transpose(1, 2)  # [B, 1, C]
-        y = self.conv(y)                   # [B, 1, C]
-        y = self.sigmoid(y).transpose(1, 2).unsqueeze(-1)  # [B, C, 1, 1]
-        return x * y.expand_as(x)
-        
-class SimpleGate(nn.Module):
-    """
-    SimpleGate module.
-
-    Splits input along channel dimension and performs element-wise multiplication.
-    """
-
-    def __init__(self, c1, c2, k=1, s=1, p=None, g=1, d=1, act=False):
-        """
-        Args:
-            c1 (int): Number of input channels.
-            c2 (int): Number of output channels.
-            k (int): Kernel size.
-            s (int): Stride.
-            p (int, optional): Padding.
-            g (int): Groups.
-            d (int): Dilation.
-            act (bool): Activation (default=False).
-        """
-        super().__init__()
-        assert c2 % 2 == 0, "SimpleGate output channels must be even"
-        self.conv = Conv(c1, c2, k=k, s=s, p=p, g=g, d=d, act=act)
-
-    def forward(self, x):
-        x = self.conv(x)
-        c = x.shape[1] // 2
-        out = x[:, :c] * x[:, c:]
-        return out
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-class MobileViT(nn.Module):
-    def __init__(self, in_channels=512, transformer_dim=192, patch_size=(2, 2), depth=2, num_heads=4):
-        super(MobileViT, self).__init__()
-        self.patch_size = patch_size
-
-        # 1. Local representation (depthwise + pointwise)
-        self.local_rep = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1, groups=in_channels),  # depthwise
-            nn.Conv2d(in_channels, transformer_dim, kernel_size=1),  # pointwise
-        )
-
-        # 2. Transformer Encoder
-        self.transformer = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=transformer_dim, nhead=num_heads, batch_first=True),
-            num_layers=depth
-        )
-
-        # 3. Fusion projection
-        self.fusion = nn.Sequential(
-            nn.Conv2d(transformer_dim, in_channels, kernel_size=1),
-            nn.Conv2d(in_channels, in_channels, kernel_size=3, padding=1)
-        )
-
-    def forward(self, x):
-        print("Input to MobileViT:", x.shape)  # Expecting [B, 512, 4, 4]
-
-        B, C, H, W = x.shape
-        ph= 2
-        pw =2
-
-        # Step 1: Local representation
-        x = self.local_rep(x)  # [B, transformer_dim, 4, 4]
-        print("After local rep:", x.shape)
-
-        # Step 2: Flatten into patches
-        x = x.reshape(B, -1, ph, H // ph, pw, W // pw)  # [B, C, 2, 2, 2, 2]
-        x = x.permute(0, 3, 5, 2, 4, 1)  # [B, H//ph, W//pw, ph, pw, C]
-        x = x.reshape(B * (H // ph) * (W // pw), ph * pw, -1)  # [B*4, 4, transformer_dim]
-
-        # Step 3: Transformer
-        x = self.transformer(x)  # [B*4, 4, transformer_dim]
-
-        # Step 4: Reshape back to image
-        x = x.reshape(B, H // ph, W // pw, ph, pw, -1).permute(0, 5, 1, 3, 2, 4)
-        x = x.reshape(B, -1, H, W)  # [B, transformer_dim, 4, 4]
-
-        # Step 5: Fusion
-        x = self.fusion(x)  # [B, in_channels, 4, 4]
-        return x
-        
-import torch
-import torch.nn as nn
-
 class DWSConv(nn.Module):
     """Depthwise Separable Conv: depthwise conv followed by pointwise conv"""
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
@@ -1008,6 +900,89 @@ class DenseBlock(nn.Module):
         x = self.bn(x)
         x = self.act(x)
         return x
+
+class Swish(nn.Module):
+    def forward(self, x):
+        return x * torch.sigmoid(x)
+
+class EfficientBlock(nn.Module):
+    def __init__(self, c1, c2, expand=1.0):
+        super(EfficientBlock, self).__init__()
+        hidden_dim = int(c1 * expand)
+        self.expand = expand != 1.0
+
+        self.expand_conv = nn.Sequential(
+            nn.Conv2d(c1, hidden_dim, 1, bias=False),
+            nn.BatchNorm2d(hidden_dim),
+            Swish()
+        ) if self.expand else nn.Identity()
+
+        self.depthwise = nn.Sequential(
+            nn.Conv2d(hidden_dim if self.expand else c1, hidden_dim if self.expand else c1,
+                      3, padding=1, groups=hidden_dim if self.expand else c1, bias=False),
+            nn.BatchNorm2d(hidden_dim if self.expand else c1),
+            Swish()
+        )
+
+        self.project = nn.Sequential(
+            nn.Conv2d(hidden_dim if self.expand else c1, c2, 1, bias=False),
+            nn.BatchNorm2d(c2)
+        )
+
+        self.use_res = (c1 == c2)
+
+    def forward(self, x):
+        identity = x
+        x = self.expand_conv(x)
+        x = self.depthwise(x)
+        x = self.project(x)
+        return x + identity if self.use_res else x
+import torch
+import torch.nn as nn
+
+class MiniC2f(nn.Module):
+    def __init__(self, c1, c2, expand=0.5):  # c1: in_channels, c2: out_channels
+        super(MiniC2f, self).__init__()
+        hidden_dim = int(c2 * expand)
+        self.conv1 = nn.Conv2d(c1, hidden_dim, kernel_size=1)
+        self.conv2 = nn.Conv2d(c1, hidden_dim, kernel_size=1)
+        self.block = nn.Sequential(
+            nn.Conv2d(hidden_dim, hidden_dim, 3, 1, 1, bias=False),
+            nn.BatchNorm2d(hidden_dim),
+            nn.ReLU(inplace=True)
+        )
+        self.conv3 = nn.Conv2d(2 * hidden_dim, c2, kernel_size=1)
+
+    def forward(self, x):
+        y1 = self.conv1(x)
+        y2 = self.block(self.conv2(x))
+        return self.conv3(torch.cat((y1, y2), dim=1))
+
+class CEMBlock(nn.Module):
+    def __init__(self, c1, c2=None):  # c1: in_channels, c2: out_channels
+        super(CEMBlock, self).__init__()
+        c2 = c1 if c2 is None else c2  # default: same output as input
+
+        self.branch1 = nn.Conv2d(c1, c1 // 2, kernel_size=1)
+
+        self.branch2 = nn.Sequential(
+            nn.Conv2d(c1, c1 // 2, kernel_size=3, padding=1, dilation=1),
+            nn.ReLU(inplace=True)
+        )
+
+        self.branch3 = nn.Sequential(
+            nn.Conv2d(c1, c1 // 2, kernel_size=3, padding=2, dilation=2),
+            nn.ReLU(inplace=True)
+        )
+
+        self.project = nn.Conv2d(3 * (c1 // 2), c2, kernel_size=1)
+
+    def forward(self, x):
+        b1 = self.branch1(x)
+        b2 = self.branch2(x)
+        b3 = self.branch3(x)
+        out = torch.cat([b1, b2, b3], dim=1)
+        return self.project(out)
         
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
@@ -1015,6 +990,8 @@ globals()['SE'] = SE
 globals()['DeformableConv'] = DeformableConv
 globals()['DenseBlock'] = DenseBlock
 globals()['SAMO'] = SAMO
-globals()['ECA'] = ECA
-globals()['SimpleGate'] = SimpleGate
-globals()['MobileViT'] = MobileViT
+globals()['EfficientBlock'] = EfficientBlock
+globals()['MiniC2f'] = MiniC2f
+globals()['CEMBlock'] = CEMBlock
+
+
