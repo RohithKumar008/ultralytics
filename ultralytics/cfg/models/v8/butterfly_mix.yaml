@@ -23,7 +23,7 @@ head :
   - [9, 1, nn.Upsample, [None, 2, "nearest"]]      # 10: upsample 
   - [[10, 6], 1, Concat, [1]]                     # 11: concat
   - [11, 1, nn.Upsample, [None, 2, "nearest"]]     # 12: upsample 
-  - [[17, 11], 1, Concat, [1]]                     # 13: concat
+  - [[3, 12], 1, Concat, [1]]                     # 13: concat
   - [13, 1, Conv, [256, 3, 1]]                    # 14: conv 1x1  P3
 
     # ===== Left Stem ====
