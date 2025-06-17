@@ -85,6 +85,7 @@ from .conv import (
     EfficientBlock,
     MiniC2f,
     CEMBlock,
+    SwinFusionBlock,
 )
 from .head import (
     OBB,
@@ -134,6 +135,7 @@ __all__ = (
     "EfficientBlock",
     "MiniC2f",
     "CEMBlock",
+    "SwinFusionBlock",
     "Concat",
     "TransformerLayer",
     "TransformerBlock",
