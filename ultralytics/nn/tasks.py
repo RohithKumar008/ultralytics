@@ -59,13 +59,13 @@ from ultralytics.nn.modules import (
     DenseBlock,
     CondConv,
     DeformableConv,
-    SimpleGate,
-    ECA,
+    EfficientBlock,
+    MiniC2f,
+    CEMBlock,
     Add,
     SE,
     CBAM,
     SAMO,
-    MobileViT,
     LRPCHead,
     Pose,
     RepC3,
@@ -89,9 +89,10 @@ globals()['SE'] = SE
 globals()['DeformableConv'] = DeformableConv
 globals()['Add'] = Add
 globals()['SAMO'] = SAMO
-globals()['ECA'] = ECA
-globals()['SimpleGate'] = SimpleGate
-globals()['MobileViT'] = MobileViT
+globals()['EfficientBlock'] = EfficientBlock
+globals()['MiniC2f'] = MiniC2f
+globals()['CEMBlock'] = CEMBlock
+
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
 from ultralytics.utils.loss import (
@@ -1649,9 +1650,9 @@ def parse_model(d, ch, verbose=True):
             SE,
             CBAM,
             SAMO,
-            SimpleGate,
-            ECA,
-            MobileViT,
+            EfficientBlock,
+            MiniC2f,
+            CEMBlock,
             Add,
             AddBlock,
             Focus,
