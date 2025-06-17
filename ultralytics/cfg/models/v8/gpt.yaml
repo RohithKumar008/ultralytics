@@ -1,0 +1,37 @@
+# Custom Blood Cell Detection Model
+nc: 3  # RBC, WBC, Platelets
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: stem (640 → 320), 32x320x320
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 1: 64x160x160
+  - [-1, 2, EfficientBlock, [64]]       # 2: Efficient residual units (160x160)
+  - [-1, 1, DWSConv, [128, 3, 2]]       # 3: 128x80x80
+  - [-1, 1, MiniC2f, [128, 256, 0.5]]   # 4: 256x80x80
+  - [-1, 1, DWSConv, [256, 3, 2]]       # 5: 256x40x40
+  - [-1, 1, MiniC2f, [256, 512, 0.5]]   # 6: 512x40x40
+  - [-1, 1, CEMBlock, [512]]            # 7: Contextual fusion, 512x40x40
+  - [-1, 1, DWSConv, [1024, 3, 2]]      # 8: 1024x20x20
+  - [-1, 1, MiniC2f, [1024, 1024, 0.5]] # 9: P5, 1024x20x20
+
+head:
+  - [6, 1, Conv, [256, 1, 1]]           # 10: P3 (40x40)
+  - [7, 1, Conv, [256, 1, 1]]           # 11: P4 (20x20)
+  - [9, 1, Conv, [256, 1, 1]]           # 12: P5 (10x10)
+
+  - [12, 1, nn.Upsample, [None, 2, "nearest"]]  # 13: up P5
+  - [[13, 11], 1, Concat, [1]]                  # 14
+  - [-1, 1, Conv, [256, 3, 1]]                  # 15: fuse P4 + upP5 → P4_fuse
+
+  - [15, 1, nn.Upsample, [None, 2, "nearest"]]  # 16: up P4_fuse
+  - [[16, 10], 1, Concat, [1]]                  # 17
+  - [-1, 1, Conv, [256, 3, 1]]                  # 18: fuse P3 + upP4 → P3_fuse
+
+  - [18, 1, Conv, [256, 3, 2]]                  # 19: down P3_fuse
+  - [[19, 15], 1, Concat, [1]]                  # 20
+  - [-1, 1, Conv, [256, 3, 1]]                  # 21: fused P4
+
+  - [21, 1, Conv, [256, 3, 2]]                  # 22: down P4_fuse
+  - [[22, 12], 1, Concat, [1]]                  # 23
+  - [-1, 1, Conv, [256, 3, 1]]                  # 24: fused P5
+  - [[18, 21, 24], 1, Detect, [nc]]  # Detect at P3 (small), P4 (medium), P5 (large)
