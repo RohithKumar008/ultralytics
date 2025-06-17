@@ -941,8 +941,8 @@ import torch
 import torch.nn as nn
 
 class MiniC2f(nn.Module):
-    def __init__(self, c1, c2, expand=0.5):  # c1: in_channels, c2: out_channels
-        super(MiniC2f, self).__init__()
+    def __init__(self, c1, c2, expand=0.5, *args, **kwargs):
+        super().__init__()
         hidden_dim = int(c2 * expand)
         self.conv1 = nn.Conv2d(c1, hidden_dim, kernel_size=1)
         self.conv2 = nn.Conv2d(c1, hidden_dim, kernel_size=1)
