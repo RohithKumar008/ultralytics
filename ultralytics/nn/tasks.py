@@ -62,7 +62,10 @@ from ultralytics.nn.modules import (
     EfficientBlock,
     MiniC2f,
     CEMBlock,
-    SwinFusionBlock,
+    SwinTransformer,
+    SwinTransformerB,
+    SwinTransformerC,
+    SwinTransformerBlock,
     Add,
     SE,
     CBAM,
@@ -93,7 +96,10 @@ globals()['SAMO'] = SAMO
 globals()['EfficientBlock'] = EfficientBlock
 globals()['MiniC2f'] = MiniC2f
 globals()['CEMBlock'] = CEMBlock
-globals()['SwinFusionBlock'] = SwinFusionBlock
+globals()['SwinTransformer'] = SwinTransformer
+globals()['SwinTransformerB'] = SwinTransformerB
+globals()['SwinTransformerC'] = SwinTransformerC
+globals()['SwinTransformerBlock'] = SwinTransformerBlock
 
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
@@ -1655,7 +1661,10 @@ def parse_model(d, ch, verbose=True):
             EfficientBlock,
             MiniC2f,
             CEMBlock,
-            SwinFusionBlock,
+            SwinTransformer,
+            SwinTransformerB,
+            SwinTransformerC,
+            SwinTransformerBlock,
             Add,
             AddBlock,
             Focus,
