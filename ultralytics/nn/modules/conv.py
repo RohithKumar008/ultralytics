@@ -1089,12 +1089,12 @@ class SwinTransformer(nn.Module):
 class SwinTransformerB(nn.Module):
     # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
     def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
-        super(Swin_Transformer_B, self).__init__()
+        super(SwinTransformerB, self).__init__()
         c_ = int(c2)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c_, c_, 1, 1)
         self.cv3 = Conv(2 * c_, c2, 1, 1)
-        num_heads = c_ // 32
+        num_heads = max(1, c_ // 32)
         self.m = SwinTransformerBlock(c_, c_, num_heads, n)
         # self.m = nn.Sequential(*[Bottleneck(c_, c_, shortcut, g, e=1.0) for _ in range(n)])
 
@@ -1108,7 +1108,7 @@ class SwinTransformerB(nn.Module):
 class SwinTransformerC(nn.Module):
     # CSP Bottleneck https://github.com/WongKinYiu/CrossStagePartialNetworks
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):  # ch_in, ch_out, number, shortcut, groups, expansion
-        super(Swin_Transformer_C, self).__init__()
+        super(SwinTransformerC, self).__init__()
         c_ = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, c_, 1, 1)
         self.cv2 = Conv(c1, c_, 1, 1)
