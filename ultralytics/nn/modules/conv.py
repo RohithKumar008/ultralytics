@@ -1251,7 +1251,7 @@ class SwinTransformerLayer(nn.Module):
         return x
 
 
-class SwinFusionBlock(nn.Module):
+class SwinTransformerBlock(nn.Module):
     def __init__(self, c1, c2, num_heads, num_layers, window_size=8):
         super().__init__()
         self.conv = None
@@ -1277,6 +1277,9 @@ globals()['SAMO'] = SAMO
 globals()['EfficientBlock'] = EfficientBlock
 globals()['MiniC2f'] = MiniC2f
 globals()['CEMBlock'] = CEMBlock
-globals()['SwinFusionBlock'] = SwinFusionBlock
+globals()['SwinTransformer'] = SwinTransformer
+globals()['SwinTransformerB'] = SwinTransformerB
+globals()['SwinTransformerC'] = SwinTransformerC
+globals()['SwinTransformerBlock'] = SwinTransformerBlock
 
 
