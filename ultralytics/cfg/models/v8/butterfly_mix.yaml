@@ -6,13 +6,13 @@ backbone:
   - [-1, 1, DWSConv, [32, 3, 2]]        # 0: stem (640 -> 320) , 32
   - [-1, 1, DWSConv, [64, 3, 2]]        # 1: 320 -> 160 , 64
   - [-1, 1, DWSConv, [128, 3, 2]]       # 2: 160 -> 80 , 128
-  - [-1, 1, SwinTransformerB, [128, 128, 4, 2]] # C3: 80x80, 2 Swin layers
+  - [-1, 1, SwinTransformer, [128]] # C3: 80x80, 2 Swin layers
   - [-1, 1, DenseBlock, [128, 3, 16]]   # 4: 80 -> 80, 128
   - [-1, 1, DWSConv, [256, 3, 2]]        # 5: 80 -> 40, 256
-  - [-1, 1, SwinTransformerB, [256, 256, 8, 2]]    # C4: 40x40
+  - [-1, 1, SwinTransformer, [256]]    # C4: 40x40
   - [-1, 1, DenseBlock, [256, 3, 16]]    # 7: 40 -> 40, 256, 
   - [-1, 1, DWSConv, [512, 3, 2]]       # 8: 40 -> 20, 512             
-  - [-1, 1, SwinTransformerB, [512, 512, 8, 2]]    # C5: 20x20
+  - [-1, 1, SwinTransformer, [512]]    # C5: 20x20
 
 # ----------------------
 # Neck + Head (Standard FPN)
