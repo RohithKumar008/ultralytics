@@ -21,18 +21,20 @@ backbone:
 head :
   # ===== Right Stem =====
   
-  - [10, 1, nn.Upsample, [None, 2, "nearest"]]      # 11: upsample 
+  - [10, 1, nn.Upsample, [None, 4, "nearest"]]      # 11: upsample 40x40
   - [[11, 7], 1, Concat, [1]]                     # 12: concat
-  - [12, 1, nn.Upsample, [None, 2, "nearest"]]     # 13: upsample 
+  - [12, 1, nn.Upsample, [None, 4, "nearest"]]     # 13: upsample 160x160
   - [[3, 12], 1, Concat, [1]]                     # 14: concat
   - [14, 1, Conv, [256, 3, 1]]                    # 15: conv 1x1  P3
 
     # ===== Left Stem ====
-  - [14, 1, DWSConv, [256, 3, 2]]                  # 16: 80 -> 40, 256
-  - [[16, 7], 1, Concat, [1]]                      # 17: concat , 40x40x512
-  - [17, 1, DWSConv, [512, 3, 2]]                  # 18: 40 -> 20, 512
-  - [[18, 9], 1, Concat, [1]]                     # 19: concat , 20x20x1024
-  - [19, 1, Conv, [512, 3, 1]]                     # 20: conv 1x1  
+  - [14, 1, DWSConv, [256, 3, 2]]                  # 16: 160 -> 80, 256
+  - [-1, 1, DWSConv, [256, 3, 2]]                  #17 : 40x40, 256
+  - [[17, 7], 1, Concat, [1]]                      # 18: concat , 40x40x512
+  - [18, 1, DWSConv, [512, 3, 2]]                  # 18: 40 -> 20, 512
+  - [-1, 1, DWSConv, [256, 3, 2]]                  #19 : 10x10, 256
+  - [[18, 9], 1, Concat, [1]]                     # 20: concat , 20x20x1024
+  - [19, 1, Conv, [512, 3, 1]]                     # 21: conv 1x1  
  
   # ===== Detect Layer =====
-  - [[20, 17, 15], 1, Detect, [nc]]    # 22: Final detect
+  - [[21, 18, 15], 1, Detect, [nc]]    # 22: Final detect
