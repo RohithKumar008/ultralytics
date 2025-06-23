@@ -5,35 +5,34 @@ nc: 3
 backbone:
   - [-1, 1, DWSConv, [32, 3, 2]]        # 0: stem (640 -> 320) , 32
   - [-1, 1, DWSConv, [64, 3, 2]]        # 1: 320 -> 160 , 64
-  - [-1, 1, DWSConv, [128, 3, 2]]       # 2: 160 -> 80 , 128
-  - [-1, 1, SwinTransformer, [128]] # C3: 80x80, 2 Swin layers
-  - [-1, 1, DenseBlock, [128, 3, 16]]   # 4: 80 -> 80, 128
-  - [-1, 1, DWSConv, [256, 3, 2]]        # 5: 80 -> 40, 256
-  - [-1, 1, SwinTransformer, [256]]    # C4: 40x40
-  - [-1, 1, DenseBlock, [256, 3, 16]]    # 7: 40 -> 40, 256, 
-  - [-1, 1, DWSConv, [512, 3, 2]]       # 8: 40 -> 20, 512             
-  - [-1, 1, SwinTransformer, [512]]    # C5: 20x20
+  - [-1, 1, DenseBlock, [64, 3, 16]]    # 2: 160 -> 160 , 64
+  - [-1, 1, CBAM, [64]]                 # 3: 160 -> 160, 64, C3
+  - [-1, 1, DWSConv, [128, 3, 2]]       # 4: 160 -> 80, 128
+  - [-1, 1, DWSConv, [256, 3, 2]]      # 5: 80 -> 40, 256
+  - [-1, 1, DenseBlock, [256, 4, 24]]   # 6: 40 -> 40 , 256
+  - [-1, 1, CBAM, [256]]                # 7: 40 -> 40, 256, C4
+  - [-1, 1, DWSConv, [512, 3, 2]]       # 8: 40 -> 20, 512
+  - [-1, 1, DWSConv, [1024, 3, 2]]       # 9: 20 -> 10, 1024
+  - [-1, 1, CBAM, [1024]]               # 10: 10 -> 10, 1024, C5
 
 # ----------------------
 # Neck + Head (Standard FPN)
 # ----------------------
 head :
   # ===== Right Stem =====
-
-  - [9, 1, nn.Upsample, [None, 2, "nearest"]]      # 10: upsample 
-  - [[10, 6], 1, Concat, [1]]                     # 11: concat
-  - [11, 1, nn.Upsample, [None, 2, "nearest"]]     # 12: upsample 
-  - [[3, 12], 1, Concat, [1]]                     # 13: concat
-  - [13, 1, Conv, [256, 3, 1]]                    # 14: conv 1x1  P3
+  
+  - [10, 1, nn.Upsample, [None, 2, "nearest"]]      # 11: upsample 
+  - [[11, 7], 1, Concat, [1]]                     # 12: concat
+  - [12, 1, nn.Upsample, [None, 2, "nearest"]]     # 13: upsample 
+  - [[3, 12], 1, Concat, [1]]                     # 14: concat
+  - [14, 1, Conv, [256, 3, 1]]                    # 15: conv 1x1  P3
 
     # ===== Left Stem ====
-  - [13, 1, DWSConv, [256, 3, 2]]                  # 15: 80 -> 40, 256
-  - [[15, 6], 1, Concat, [1]]                      # 16: concat , 40x40x512
-  - [16, 1, C2f, [512]]                            # 17:  40 -> 40 , 512 , P4
+  - [14, 1, DWSConv, [256, 3, 2]]                  # 16: 80 -> 40, 256
+  - [[16, 7], 1, Concat, [1]]                      # 17: concat , 40x40x512
   - [17, 1, DWSConv, [512, 3, 2]]                  # 18: 40 -> 20, 512
   - [[18, 9], 1, Concat, [1]]                     # 19: concat , 20x20x1024
   - [19, 1, Conv, [512, 3, 1]]                     # 20: conv 1x1  
-  - [20, 1, C2f, [512]]                          # 21:  40 -> 40 , 512 , P5
  
   # ===== Detect Layer =====
-  - [[21, 17, 14], 1, Detect, [nc]]    # 22: Final detect
+  - [[20, 17, 15], 1, Detect, [nc]]    # 22: Final detect
