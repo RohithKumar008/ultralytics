@@ -844,7 +844,7 @@ class TripletAttention(nn.Module):
         return x * torch.sigmoid(x1 + x2 + x3)
         
 class GatedFusion(nn.Module):
-    def __init__(self, channels, c2=None):
+    def __init__(self, channels):
         super().__init__()
         self.gate = nn.Sequential(
             nn.Conv2d(channels * 2, channels, 1),
@@ -855,7 +855,7 @@ class GatedFusion(nn.Module):
     def forward(self, x: List[torch.Tensor]):  # Accept list of two tensors
         assert isinstance(x, list) and len(x) == 2, "GatedFusion expects a list of two tensors"
         x1, x2 = x
-        w = self.gate(torch.cat([x1, x2], dim=1))         # shape: [B, channels, H, W]
+        w = self.gate(torch.cat(x, dim=1))         # shape: [B, channels, H, W]
         fused = w * x1 + (1 - w) * x2
         return self.out(torch.cat([fused, x1], dim=1))     # [B, 2C, H, W] → [B, C, H, W]
         
