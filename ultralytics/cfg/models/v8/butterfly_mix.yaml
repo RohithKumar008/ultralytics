@@ -21,20 +21,20 @@ backbone:
 head :
     # -- Step 1: Feature adaptors with better attention --
   - [3, 1, Conv, [128, 1, 1]]     #11: P3
-  - [-1, 1, TripletAttention, [128]]  #12: More advanced than SE/CBAM
+  - [11, 1, TripletAttention, [128]]  #12: More advanced than SE/CBAM
   - [7, 1, Conv, [128, 1, 1]]     #13: P4
-  - [-1, 1, TripletAttention, [128]] #14
+  - [13, 1, TripletAttention, [128]] #14
   - [10, 1, Conv, [128, 1, 1]]     #15: P5
-  - [-1, 1, TripletAttention, [128]]  #16
+  - [15, 1, TripletAttention, [128]]  #16
   
   # -- Step 2: Top-down fusion --
   - [16, 1, nn.Upsample, [None, 2, "nearest"]] #17
-  - [[-1, 14], 1, GatedFusion, [128]]      #18: modulated fusion
-  - [-1, 1, Conv, [128, 3, 1]]  #19
+  - [[17, 14], 1, GatedFusion, [128]]      #18: modulated fusion
+  - [18, 1, Conv, [128, 3, 1]]  #19
   
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  #20
-  - [[-1, 12], 1, GatedFusion, [128]]  #21
-  - [-1, 1, Conv, [128, 3, 1]]  #22
+  - [19, 1, nn.Upsample, [None, 2, "nearest"]]  #20
+  - [[10, 12], 1, GatedFusion, [128]]  #21
+  - [21, 1, Conv, [128, 3, 1]]  #22
 
   - [[22, 19, 16], 1, Detect, [nc]] #23
 
