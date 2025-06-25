@@ -852,10 +852,12 @@ class GatedFusion(nn.Module):
         )
         self.out = nn.Conv2d(channels * 2, channels, 3, padding=1)
 
-    def forward(self, x1, x2):
+    def forward(self, inputs):
+        x1, x2 = inputs  # Unpack list of inputs
         w = self.gate(torch.cat([x1, x2], dim=1))
         fused = w * x1 + (1 - w) * x2
         return self.out(torch.cat([fused, x1], dim=1))
+        
 class DWSConv(nn.Module):
     """Depthwise Separable Conv: depthwise conv followed by pointwise conv"""
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
