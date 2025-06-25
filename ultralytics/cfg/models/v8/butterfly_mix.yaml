@@ -33,7 +33,7 @@ head :
   - [18, 1, Conv, [128, 3, 1]]  #19
   
   - [19, 1, nn.Upsample, [None, 2, "nearest"]]  #20
-  - [[10, 12], 1, GatedFusion, [128]]  #21
+  - [[20, 12], 1, GatedFusion, [128]]  #21
   - [21, 1, Conv, [128, 3, 1]]  #22
 
   - [[22, 19, 16], 1, Detect, [nc]] #23
