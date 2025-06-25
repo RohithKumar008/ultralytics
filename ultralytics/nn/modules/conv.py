@@ -24,6 +24,8 @@ __all__ = (
     "Concat",
     "RepConv",
     "Index",
+    "TripletAttention",
+    "GatedFusion",
     "DWSConv",
     "CondConv",
     "SE",
@@ -829,7 +831,31 @@ class SAMO(nn.Module):
         """
         mask = self.sigmoid(self.conv(x))  # [B, 1, H, W]
         return x * mask  # Broadcasted element-wise modulation
+        
+class TripletAttention(nn.Module):
+    def __init__(self, channels, c2=None):
+        super().__init__()
+        self.conv = nn.Conv2d(channels, channels, 1)
 
+    def forward(self, x):
+        x1 = self.conv(x.mean(dim=2, keepdim=True))     # Y-axis
+        x2 = self.conv(x.mean(dim=3, keepdim=True))     # X-axis
+        x3 = self.conv(x.mean(dim=(2, 3), keepdim=True))  # channel
+        return x * torch.sigmoid(x1 + x2 + x3)
+        
+class GatedFusion(nn.Module):
+    def __init__(self, channels, c2=None):
+        super().__init__()
+        self.gate = nn.Sequential(
+            nn.Conv2d(channels * 2, channels, 1),
+            nn.Sigmoid()
+        )
+        self.out = nn.Conv2d(channels * 2, channels, 3, padding=1)
+
+    def forward(self, x1, x2):
+        w = self.gate(torch.cat([x1, x2], dim=1))
+        fused = w * x1 + (1 - w) * x2
+        return self.out(torch.cat([fused, x1], dim=1))
 class DWSConv(nn.Module):
     """Depthwise Separable Conv: depthwise conv followed by pointwise conv"""
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
@@ -1270,7 +1296,9 @@ class SwinTransformerBlock(nn.Module):
             x = self.conv(x)
         x = self.blocks(x)
         return x
-        
+
+globals()['TripletAttention'] = TripletAttention
+globals()['GatedFusion'] = GatedFusion
 globals()['DWSConv'] = DWSConv
 globals()['CondConv'] = CondConv
 globals()['SE'] = SE
