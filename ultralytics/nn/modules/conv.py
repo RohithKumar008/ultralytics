@@ -857,7 +857,7 @@ class GatedFusion(nn.Module):
         x1, x2 = x
         print("x1 shape:", x1.shape)
         print("x2 shape:", x2.shape)
-        w = self.gate(torch.cat(x, dim=1))         # shape: [B, channels, H, W]
+        w = self.gate(torch.cat([x1,x2], dim=1))         # shape: [B, channels, H, W]
         fused = w * x1 + (1 - w) * x2
         print("fused shape:", fused.shape)
         print("concat shape:", torch.cat([fused, x1], dim=1).shape)
