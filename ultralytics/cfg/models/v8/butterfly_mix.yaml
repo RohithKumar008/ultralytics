@@ -28,12 +28,12 @@ head :
   - [15, 1, TripletAttention, [128]]  #16
   
   # -- Step 2: Top-down fusion --
-  - [16, 1, nn.Upsample, [None, 2, "nearest"]]       #17
+  - [16, 1, nn.Upsample, [None, 4, "nearest"]]       #17
   - [[17, 14], 1, Concat, [1]]                       #18
   - [-1, 1, GatedFusion, [128]]                      #19
   - [19, 1, Conv, [128, 3, 1]]                       #20
   
-  - [20, 1, nn.Upsample, [None, 2, "nearest"]]       #21
+  - [20, 1, nn.Upsample, [None, 4, "nearest"]]       #21
   - [[21, 12], 1, Concat, [1]]                       #22
   - [-1, 1, GatedFusion, [128]]                      #23
   - [23, 1, Conv, [128, 3, 1]]                       #24
