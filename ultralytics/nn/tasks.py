@@ -55,6 +55,8 @@ from ultralytics.nn.modules import (
     HGStem,
     ImagePoolingAttn,
     Index,
+    TripletAttention,
+    GatedFusion,
     DWSConv,
     DenseBlock,
     CondConv,
@@ -86,6 +88,8 @@ from ultralytics.nn.modules import (
     YOLOESegment,
     v10Detect,
 )
+globals()['TripletAttention'] = TripletAttention
+globals()['GatedFusion'] = GatedFusion
 globals()['DWSConv'] = DWSConv
 globals()['DenseBlock'] = DenseBlock
 globals()['CondConv'] = CondConv
@@ -1651,6 +1655,8 @@ def parse_model(d, ch, verbose=True):
             C2fPSA,
             C2PSA,
             DWConv,
+            TripletAttention,
+            GatedFusion,
             DWSConv,
             DenseBlock,
             CondConv,
