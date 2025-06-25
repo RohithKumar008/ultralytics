@@ -850,7 +850,6 @@ class GatedFusion(nn.Module):
             nn.Conv2d(channels * 2, channels, 1),
             nn.Sigmoid()
         )
-        self.out = nn.Conv2d(channels * 2, channels, 3, padding=1)
 
     def forward(self, x: List[torch.Tensor]):  # Accept list of two tensors
         assert isinstance(x, list) and len(x) == 2, "GatedFusion expects a list of two tensors"
@@ -861,7 +860,7 @@ class GatedFusion(nn.Module):
         fused = w * x1 + (1 - w) * x2
         print("fused shape:", fused.shape)
         print("concat shape:", torch.cat([fused, x1], dim=1).shape)
-        return self.out(torch.cat([fused, x1], dim=1))     # [B, 2C, H, W] → [B, C, H, W]
+        return torch.cat([fused, x1], dim=1)   # [B, 2C, H, W] → [B, C, H, W]
         
 class DWSConv(nn.Module):
     """Depthwise Separable Conv: depthwise conv followed by pointwise conv"""
