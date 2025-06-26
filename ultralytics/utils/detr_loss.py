@@ -1,67 +1,89 @@
-# File: detr_loss.py
+# detr_loss.py
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.ops.boxes import generalized_box_iou
+from torchvision.ops import generalized_box_iou
 from scipy.optimize import linear_sum_assignment
 
-class DETRLoss:
-    def __init__(self, num_classes, matcher_cost_class=1.0, matcher_cost_bbox=5.0, matcher_cost_giou=2.0):
+
+def box_cxcywh_to_xyxy(boxes):
+    # Convert [cx, cy, w, h] -> [x_min, y_min, x_max, y_max]
+    x_c, y_c, w, h = boxes.unbind(-1)
+    b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
+         (x_c + 0.5 * w), (y_c + 0.5 * h)]
+    return torch.stack(b, dim=-1)
+
+
+def box_iou(boxes1, boxes2):
+    # Compute IoU for box1 & box2
+    area1 = (boxes1[:, 2] - boxes1[:, 0]) * (boxes1[:, 3] - boxes1[:, 1])
+    area2 = (boxes2[:, 2] - boxes2[:, 0]) * (boxes2[:, 3] - boxes2[:, 1])
+
+    lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])
+    rb = torch.min(boxes1[:, None, 2:], boxes2[:, 2:])
+
+    wh = (rb - lt).clamp(min=0)
+    inter = wh[:, :, 0] * wh[:, :, 1]
+
+    union = area1[:, None] + area2 - inter
+    iou = inter / union
+    return iou
+
+
+def hungarian_match(outputs, targets):
+    # outputs: dict with 'pred_logits' and 'pred_boxes'
+    # targets: list of dicts with 'labels' and 'boxes'
+    indices = []
+    for b in range(len(targets)):
+        out_prob = outputs['pred_logits'][b].softmax(-1)  # [num_queries, num_classes+1]
+        out_bbox = outputs['pred_boxes'][b]               # [num_queries, 4]
+
+        tgt_ids = targets[b]['labels']                    # [num_targets]
+        tgt_bbox = targets[b]['boxes']                    # [num_targets, 4]
+
+        cost_class = -out_prob[:, tgt_ids]                # [num_queries, num_targets]
+        cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
+        cost_giou = -generalized_box_iou(
+            box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
+
+        C = 1.0 * cost_class + 5.0 * cost_bbox + 2.0 * cost_giou
+        C = C.cpu()
+
+        indices.append(linear_sum_assignment(C))
+    return indices
+
+
+class DETRLoss(nn.Module):
+    def __init__(self, num_classes=3):
+        super().__init__()
         self.num_classes = num_classes
-        self.cost_class = matcher_cost_class
-        self.cost_bbox = matcher_cost_bbox
-        self.cost_giou = matcher_cost_giou
+        self.class_loss = nn.CrossEntropyLoss()
+        self.l1_loss = nn.L1Loss()
 
-    def loss(self, outputs, targets):
-        # outputs: logits [B, Q, C+1], boxes [B, Q, 4]
-        # targets: list of dicts with 'labels' and 'boxes'
-        bs, num_queries = outputs["pred_logits"].shape[:2]
+    def forward(self, outputs, targets):
+        # outputs: dict with 'pred_logits', 'pred_boxes'
+        # targets: list of dicts with 'labels', 'boxes'
+        indices = hungarian_match(outputs, targets)
+        bs, num_queries = outputs['pred_logits'].shape[:2]
 
-        # Step 1: Match predictions to targets using Hungarian matcher
-        indices = self.matcher(outputs, targets)
+        loss_cls = 0
+        loss_bbox = 0
+        loss_giou = 0
+        for b, (src_idx, tgt_idx) in enumerate(indices):
+            src_logits = outputs['pred_logits'][b][src_idx]         # [num_matched, C+1]
+            tgt_labels = targets[b]['labels'][tgt_idx]              # [num_matched]
+            loss_cls += self.class_loss(src_logits, tgt_labels)
 
-        # Step 2: Classification loss (cross entropy)
-        idx = self._get_permutation_idx(indices)
-        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
-        pred_logits = outputs["pred_logits"]
-        pred_classes = pred_logits[idx]
-        target_classes = torch.full(pred_classes.shape[:1], self.num_classes, dtype=torch.int64, device=pred_classes.device)
-        target_classes[:len(target_classes_o)] = target_classes_o
-        loss_ce = F.cross_entropy(pred_classes, target_classes)
-
-        # Step 3: Box L1 and GIoU
-        pred_boxes = outputs["pred_boxes"][idx]
-        target_boxes = torch.cat([t["boxes"][i] for t, (_, i) in zip(targets, indices)], dim=0)
-
-        loss_bbox = F.l1_loss(pred_boxes, target_boxes, reduction='none').sum() / bs
-        loss_giou = (1 - torch.diag(generalized_box_iou(pred_boxes, target_boxes))).sum() / bs
+            src_boxes = outputs['pred_boxes'][b][src_idx]
+            tgt_boxes = targets[b]['boxes'][tgt_idx]
+            loss_bbox += self.l1_loss(src_boxes, tgt_boxes)
+            giou = generalized_box_iou(
+                box_cxcywh_to_xyxy(src_boxes), box_cxcywh_to_xyxy(tgt_boxes))
+            loss_giou += (1 - giou).mean()
 
         return {
-            'loss_ce': loss_ce,
-            'loss_bbox': loss_bbox,
-            'loss_giou': loss_giou
+            'loss_cls': loss_cls / bs,
+            'loss_bbox': loss_bbox / bs,
+            'loss_giou': loss_giou / bs,
         }
-
-    def matcher(self, outputs, targets):
-        # outputs: logits [B, Q, C+1], boxes [B, Q, 4]
-        out_prob = outputs["pred_logits"].softmax(-1)  # [B, Q, C+1]
-        out_bbox = outputs["pred_boxes"]
-
-        indices = []
-        for b in range(out_prob.shape[0]):
-            tgt_ids = targets[b]['labels']
-            tgt_bbox = targets[b]['boxes']
-
-            cost_class = -out_prob[b][:, tgt_ids]  # [Q, T]
-            cost_bbox = torch.cdist(out_bbox[b], tgt_bbox, p=1)
-            cost_giou = -generalized_box_iou(out_bbox[b], tgt_bbox)
-
-            cost = self.cost_class * cost_class + self.cost_bbox * cost_bbox + self.cost_giou * cost_giou
-            i, j = linear_sum_assignment(cost.cpu())
-            indices.append((torch.as_tensor(i, dtype=torch.int64), torch.as_tensor(j, dtype=torch.int64)))
-        return indices
-
-    def _get_permutation_idx(self, indices):
-        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
-        src_idx = torch.cat([src for (src, _) in indices])
-        return (batch_idx, src_idx)
