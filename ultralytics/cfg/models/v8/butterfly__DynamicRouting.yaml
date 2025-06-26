@@ -25,9 +25,9 @@ head:
   - [10, 1, Conv, [128, 1, 1]]        # 13: P2_left
 
   - [13, 1, nn.Upsample, [None, 4, "nearest"]]     # 14: upsample P2_left
-  - [[14, 12], 1, DynamicRouting, [128]]           # 15: fused P3 left (cond from P3)
+  - [[14, 12], 1, DynamicRouting, [128,128]]           # 15: fused P3 left (cond from P3)
   - [15, 1, nn.Upsample, [None, 4, "nearest"]]     # 16: upsample fused left
-  - [[16, 11], 1, DynamicRouting, [128]]           # 17: out_left (cond from P1)
+  - [[16, 11], 1, DynamicRouting, [128,128]]           # 17: out_left (cond from P1)
 
   # ===== Right Stem =====
   - [3, 1, Conv, [128, 1, 1]]         # 18: C3
@@ -38,14 +38,14 @@ head:
   - [-1, 1, SE, [128]]                # 23: P2_right
 
   - [23, 1, nn.Upsample, [None, 4, "nearest"]]     # 24: upsample P2_right
-  - [[24, 21], 1, DynamicRouting, [128]]           # 25: fused P3 right (cond from P3)
+  - [[24, 21], 1, DynamicRouting, [128,128]]           # 25: fused P3 right (cond from P3)
   - [25, 1, nn.Upsample, [None, 4, "nearest"]]     # 26
-  - [[26, 19], 1, DynamicRouting, [128]]           # 27: out_right (cond from P1)
+  - [[26, 19], 1, DynamicRouting, [128,128]]           # 27: out_right (cond from P1)
 
   # ===== Fusion for Detect Heads =====
-  - [[15, 25], 1, DynamicRouting, [128]]           # 28: head_2 input (P3 fusion, cond = P3_left)
-  - [[13, 23], 1, DynamicRouting, [128]]           # 29: head_3 input (P2 fusion, cond = P2_left)
-  - [[17, 27], 1, DynamicRouting, [128]]           # 30: head_1 input (P1 fusion, cond = P1_left)
+  - [[15, 25], 1, DynamicRouting, [128,128]]           # 28: head_2 input (P3 fusion, cond = P3_left)
+  - [[13, 23], 1, DynamicRouting, [128,128]]           # 29: head_3 input (P2 fusion, cond = P2_left)
+  - [[17, 27], 1, DynamicRouting, [128,128]]           # 30: head_1 input (P1 fusion, cond = P1_left)
 
   # Optional conv refinements
   - [28, 1, Conv, [128, 3, 1]]                     # 31
