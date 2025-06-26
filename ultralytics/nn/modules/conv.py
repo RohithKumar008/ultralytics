@@ -1311,8 +1311,6 @@ class CrossAttentionFuse(nn.Module):
     def forward(self, x: List[torch.Tensor]):
         assert isinstance(x, list) and len(x) == 2, "GatedFusion expects a list of two tensors"
         x_low,x_high = x
-        print("x_low:", x_low.shape)
-        print("x_high:", x_high.shape)
         Q = self.query(x_low)
         K = self.key(x_high)
         V = self.value(x_high)
