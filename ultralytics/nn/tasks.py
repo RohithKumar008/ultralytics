@@ -175,16 +175,9 @@ class BaseModel(torch.nn.Module):
         Returns:
             (torch.Tensor): Loss if x is a dict (training), or network predictions (inference).
         """
-        # if isinstance(x, dict):  # for cases of training and validating while training.
-        #     return self.loss(x, *args, **kwargs)
-        # return self.predict(x, *args, **kwargs)
-        if isinstance(x, dict):  # training mode
+        if isinstance(x, dict):  # for cases of training and validating while training.
             return self.loss(x, *args, **kwargs)
-    
-        out = self.predict(x, *args, **kwargs)
-        if isinstance(out, tuple):  # if DETR-style (logits, boxes)
-            return out
-        return out
+        return self.predict(x, *args, **kwargs)
 
     def predict(self, x, profile=False, visualize=False, augment=False, embed=None):
         """
@@ -200,10 +193,9 @@ class BaseModel(torch.nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        # if augment:
-        #     return self._predict_augment(x)
-        # return self._predict_once(x, profile, visualize, embed)
-        return self._predict_once(x)
+        if augment:
+            return self._predict_augment(x)
+        return self._predict_once(x, profile, visualize, embed)
 
     def _predict_once(self, x, profile=False, visualize=False, embed=None):
         """
