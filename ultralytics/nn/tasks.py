@@ -1775,7 +1775,7 @@ def parse_model(d, ch, verbose=True):
             assert all(ch[x] == ch[f[0]] for x in f), f"All inputs to {m} must have same channels"
             c2 = ch[f[0]]  # or max(ch[x] for x in f) if they differ and you handle it
         elif m is DynamicRouting:
-            c2 = args[1]  # out_channels
+            c2 = args[0]  # out_channels
         elif m in frozenset(
             {Detect, WorldDetect, YOLOEDetect, Segment, YOLOESegment, Pose, OBB, ImagePoolingAttn, v10Detect}
         ):
