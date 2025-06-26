@@ -1769,6 +1769,9 @@ def parse_model(d, ch, verbose=True):
             args = [ch[f]]
         elif m is (Concat, GatedFusion, CrossAttentionFuse):
             c2 = sum(ch[x] for x in f)
+        elif m is CrossAttentionFuse:
+            assert all(ch[x] == ch[f[0]] for x in f), f"All inputs to {m} must have same channels"
+            c2 = ch[f[0]]  # or max(ch[x] for x in f) if they differ and you handle it
         elif m in frozenset(
             {Detect, WorldDetect, YOLOEDetect, Segment, YOLOESegment, Pose, OBB, ImagePoolingAttn, v10Detect}
         ):
