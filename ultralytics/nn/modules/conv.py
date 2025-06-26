@@ -1329,9 +1329,11 @@ class DynamicRouting(nn.Module):
         )
         self.project = nn.Conv2d(in_channels, out_channels, 3, padding=1)
 
-    def forward(self, x, condition_source):
+    def forward(self, x):
+        assert isinstance(x, list) and len(x) == 2, "DynamicRouting expects a list of [x, condition_source]"
+        x_input, condition_source = x
         cond = self.cond(self.avgpool(condition_source))
-        return self.project(x * cond)
+        return self.project(x_input * cond)
 
 globals()['DynamicRouting'] = DynamicRouting
 globals()['CrossAttentionFuse'] = CrossAttentionFuse
