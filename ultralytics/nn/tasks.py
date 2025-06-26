@@ -13,6 +13,7 @@ from ultralytics.nn.modules.conv import DWSConv, CondConv, SE, DeformableConv
 from ultralytics.nn.modules.block import Add
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules.custom import AddBlock
+from ultralytics.nn.modules.detr import DETRHead
 from ultralytics.nn.modules import (
     AIFI,
     C1,
