@@ -200,9 +200,10 @@ class BaseModel(torch.nn.Module):
         Returns:
             (torch.Tensor): The last output of the model.
         """
-        if augment:
-            return self._predict_augment(x)
-        return self._predict_once(x, profile, visualize, embed)
+        # if augment:
+        #     return self._predict_augment(x)
+        # return self._predict_once(x, profile, visualize, embed)
+        return self._predict_once(x)
 
     def _predict_once(self, x, profile=False, visualize=False, embed=None):
         """
