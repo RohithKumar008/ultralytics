@@ -24,6 +24,7 @@ __all__ = (
     "Concat",
     "RepConv",
     "Index",
+    "CrossAttentionFuse"
     "TripletAttention",
     "GatedFusion",
     "DWSConv",
@@ -1298,7 +1299,24 @@ class SwinTransformerBlock(nn.Module):
             x = self.conv(x)
         x = self.blocks(x)
         return x
+        
+class CrossAttentionFuse(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.query = nn.Conv2d(channels, channels, 1)
+        self.key = nn.Conv2d(channels, channels, 1)
+        self.value = nn.Conv2d(channels, channels, 1)
+        self.out = nn.Conv2d(channels, channels, 1)
 
+    def forward(self, x_low, x_high):
+        Q = self.query(x_low)
+        K = self.key(x_high)
+        V = self.value(x_high)
+        A = torch.sigmoid(Q * K)
+        fused = A * V + (1 - A) * x_low
+        return self.out(fused)
+
+globals()['CrossAttentionFuse'] = CrossAttentionFuse
 globals()['TripletAttention'] = TripletAttention
 globals()['GatedFusion'] = GatedFusion
 globals()['DWSConv'] = DWSConv
