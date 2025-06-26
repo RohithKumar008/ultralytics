@@ -1308,7 +1308,9 @@ class CrossAttentionFuse(nn.Module):
         self.value = nn.Conv2d(channels, channels, 1)
         self.out = nn.Conv2d(channels, channels, 1)
 
-    def forward(self, x_low, x_high):
+    def forward(self, x: List[torch.Tensor]):
+        assert isinstance(x, list) and len(x) == 2, "GatedFusion expects a list of two tensors"
+        x_low,x_high = x
         Q = self.query(x_low)
         K = self.key(x_high)
         V = self.value(x_high)
