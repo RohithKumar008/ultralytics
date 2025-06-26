@@ -56,6 +56,7 @@ from ultralytics.nn.modules import (
     ImagePoolingAttn,
     Index,
     TripletAttention,
+    CrossAttentionFuse,
     GatedFusion,
     DWSConv,
     DenseBlock,
@@ -88,6 +89,8 @@ from ultralytics.nn.modules import (
     YOLOESegment,
     v10Detect,
 )
+
+globals()['CrossAttentionFuse'] = CrossAttentionFuse
 globals()['TripletAttention'] = TripletAttention
 globals()['GatedFusion'] = GatedFusion
 globals()['DWSConv'] = DWSConv
@@ -1656,6 +1659,7 @@ def parse_model(d, ch, verbose=True):
             C2PSA,
             DWConv,
             TripletAttention,
+            CrossAttentionFuse,
             DWSConv,
             DenseBlock,
             CondConv,
