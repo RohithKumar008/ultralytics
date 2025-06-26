@@ -24,6 +24,7 @@ __all__ = (
     "Concat",
     "RepConv",
     "Index",
+    "DynamicRouting",
     "CrossAttentionFuse"
     "TripletAttention",
     "GatedFusion",
@@ -1318,6 +1319,21 @@ class CrossAttentionFuse(nn.Module):
         fused = A * V + (1 - A) * x_low
         return self.out(fused)
 
+class DynamicRouting(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.cond = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 1),
+            nn.Sigmoid()
+        )
+        self.project = nn.Conv2d(in_channels, out_channels, 3, padding=1)
+
+    def forward(self, x, condition_source):
+        cond = self.cond(self.avgpool(condition_source))
+        return self.project(x * cond)
+
+globals()['DynamicRouting'] = DynamicRouting
 globals()['CrossAttentionFuse'] = CrossAttentionFuse
 globals()['TripletAttention'] = TripletAttention
 globals()['GatedFusion'] = GatedFusion
