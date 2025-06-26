@@ -24,7 +24,7 @@ head :
   - [11, 1, Conv, [256, 1, 1]]         # 12: P2_left
 
   - [12, 1, nn.Upsample, [None, 4, "nearest"]]          # 13, 40x40x256
-  - [[13, 17], 1, CrossAttentionFuse, [256]]             # 14, 40x40x256
+  - [[13, 7], 1, CrossAttentionFuse, [256]]             # 14, 40x40x256
   - [14, 1, nn.Upsample, [None, 4, "nearest"]]          # 15, 160x160x256
   - [15, 1, Conv, [64, 1, 1]]                           # 16, 160x160x64
   - [[16, 3], 1, CrossAttentionFuse, [64]]              # 17, 160x160x64
@@ -34,7 +34,7 @@ head :
   - [18, 1, DWSConv, [256, 3, 2]]                       # 19, 40x40x256
   - [[19, 14], 1, CrossAttentionFuse, [256]]           # 20, 40x40x256
   - [20, 1, DWSConv, [512, 3, 2]]                        # 21, 20x20x512
-  - [21, 1, DWSConv, [512, 1, 1]]                        # 22, 10x10x512
+  - [21, 1, conv, [512, 1, 1]]                        # 22, 10x10x512
   - [[22, 11], 1, CrossAttentionFuse, [512]]            # 23, 10x10x512
   
   - [[23, 20, 17], 1, Detect, [nc]]                     # 25
