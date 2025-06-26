@@ -1,0 +1,56 @@
+# ----------------------
+# Custom Backbone
+# ----------------------
+nc: 3
+backbone:
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: stem (640 -> 320) , 32
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 1: 320 -> 160 , 64
+  - [-1, 1, DenseBlock, [64, 3, 16]]    # 2: 160 -> 160 , 64
+  - [-1, 1, CBAM, [64]]                 # 3: 160 -> 160, 64, C3
+  - [-1, 1, DWSConv, [128, 3, 2]]       # 4: 160 -> 80, 128
+  - [-1, 1, DWSConv, [256, 3, 2]]      # 5: 80 -> 40, 256
+  - [-1, 1, DenseBlock, [256, 4, 24]]   # 6: 40 -> 40 , 256
+  - [-1, 1, CBAM, [256]]                # 7: 40 -> 40, 256, C4
+  - [-1, 1, DWSConv, [512, 3, 2]]       # 8: 40 -> 20, 512
+  - [-1, 1, DWSConv, [1024, 3, 2]]       # 9: 20 -> 10, 1024
+  - [-1, 1, CBAM, [1024]]               # 10: 10 -> 10, 1024, C5
+
+# ----------------------
+# Neck + Head (Standard FPN)
+# ----------------------
+head:
+  # ===== Left Stem =====
+  - [3, 1, Conv, [128, 1, 1]]         # 11: P3_left
+  - [7, 1, Conv, [128, 1, 1]]         # 12: P1_left
+  - [10, 1, Conv, [128, 1, 1]]        # 13: P2_left
+
+  - [13, 1, nn.Upsample, [None, 4, "nearest"]]     # 14: upsample P2_left
+  - [[14, 11], 1, DynamicRouting, [128]]           # 15: fused P3 left (cond from P3)
+  - [15, 1, nn.Upsample, [None, 4, "nearest"]]     # 16: upsample fused left
+  - [[16, 12], 1, DynamicRouting, [128]]           # 17: out_left (cond from P1)
+
+  # ===== Right Stem =====
+  - [3, 1, Conv, [128, 1, 1]]         # 18: C3
+  - [-1, 1, SE, [128]]                # 19: P3_right
+  - [7, 1, Conv, [128, 1, 1]]         # 20: C1
+  - [-1, 1, SE, [128]]                # 21: P1_right
+  - [10, 1, Conv, [128, 1, 1]]        # 22: C2
+  - [-1, 1, SE, [128]]                # 23: P2_right
+
+  - [23, 1, nn.Upsample, [None, 4, "nearest"]]     # 24: upsample P2_right
+  - [[24, 19], 1, DynamicRouting, [128]]           # 25: fused P3 right (cond from P3)
+  - [25, 1, nn.Upsample, [None, 4, "nearest"]]     # 26
+  - [[26, 21], 1, DynamicRouting, [128]]           # 27: out_right (cond from P1)
+
+  # ===== Fusion for Detect Heads =====
+  - [[15, 25], 1, DynamicRouting, [128]]           # 28: head_2 input (P3 fusion, cond = P3_left)
+  - [[13, 23], 1, DynamicRouting, [128]]           # 29: head_3 input (P2 fusion, cond = P2_left)
+  - [[17, 27], 1, DynamicRouting, [128]]           # 30: head_1 input (P1 fusion, cond = P1_left)
+
+  # Optional conv refinements
+  - [28, 1, Conv, [128, 3, 1]]                     # 31
+  - [29, 1, Conv, [128, 3, 1]]                     # 32
+  - [30, 1, Conv, [128, 3, 1]]                     # 33
+
+  # ===== Detect Layer =====
+  - [[31, 32, 33], 1, Detect, [nc]]                # 34
