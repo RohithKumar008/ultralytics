@@ -25,10 +25,10 @@ head :
   - [10, 1,Conv, [128, 1, 1]]         # 13: C5 -> conv, 10x10x128
 
   - [13, 1, nn.Upsample, [None, 4, "nearest"]]     # 14 P5: upsample C5, 40x40x128
-  - [[14, 12], 1, Concat, [1]]                     # 15: concat P5,C4, 40x4x0x256
+  - [[14, 12], 1, GatedFusion, [128]]              # 15: concat P5,C4, 40x4x0x256
   - [-1, 1, Conv, [128, 3, 1]]                     # 16: 40x40x128
   - [-1, 1, nn.Upsample, [None, 4, "nearest"]]     # 17: upsample , 160x160x128
-  - [[17, 3], 1, Concat, [1]]                     # 18: concat, 160x160x256
+  - [[17, 3], 1, GatedFusion, [128]]              # 18: concat, 160x160x256
   - [-1, 1, Conv, [128, 3, 1]]                     # 19: 160x160x128
 
   # ===== Detect Layer =====
