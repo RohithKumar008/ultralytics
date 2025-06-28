@@ -28,7 +28,7 @@ head :
   - [[14, 12], 1, GatedFusion, [128]]              # 15: concat P5,C4, 40x4x0x256
   - [-1, 1, Conv, [128, 3, 1]]                     # 16: 40x40x128
   - [-1, 1, nn.Upsample, [None, 4, "nearest"]]     # 17: upsample , 160x160x128
-  - [[17, 3], 1, GatedFusion, [128]]              # 18: concat, 160x160x256
+  - [[17, 11], 1, GatedFusion, [128]]              # 18: concat, 160x160x256
   - [-1, 1, Conv, [128, 3, 1]]                     # 19: 160x160x128
 
   # ===== Detect Layer =====
