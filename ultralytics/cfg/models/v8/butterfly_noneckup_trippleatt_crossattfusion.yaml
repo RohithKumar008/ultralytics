@@ -30,4 +30,4 @@ head :
   - [[16, 11], 1, CrossAttentionFuse, [256]]      # 17: concat, 160x160x256
 
   # ===== Detect Layer =====
-  - [[19, 16, 13], 1, Detect, [nc]]    # 41: Final detect
+  - [[17, 15, 13], 1, Detect, [nc]]    # 41: Final detect
