@@ -27,7 +27,7 @@ head :
   - [13, 1, nn.Upsample, [None, 4, "nearest"]]     # 14 P5: upsample C5, 40x40x128
   - [[14, 12], 1, CrossAttentionFuse, [128]]       # 15: concat P5,C4, 40x4x0x256
   - [-1, 1, nn.Upsample, [None, 4, "nearest"]]     # 16: upsample , 160x160x128
-  - [[16, 11], 1, CrossAttentionFuse, [256]]      # 17: concat, 160x160x256
+  - [[16, 11], 1, CrossAttentionFuse, [128]]      # 17: concat, 160x160x256
 
   # ===== Detect Layer =====
   - [[17, 15, 13], 1, Detect, [nc]]    # 41: Final detect
