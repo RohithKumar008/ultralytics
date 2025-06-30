@@ -1,69 +1,58 @@
-# Ultralytics-style model config for UltimateBackbone with 3 output heads (P3, P4, P5)
-
-# Parameters
-nc: 3  # number of classes: RBC, WBC, Platelets
-
+# ----------------------
+# Custom Backbone
+# ----------------------
+nc: 3
 backbone:
-  - [-1, 1, DWSConv, [32, 3, 2]]         # 0: stem (640 -> 320), 32
-  - [-1, 1, DWSConv, [64, 3, 2]]         # 1: 320 -> 160, 64
-  - [-1, 1, DenseBlock, [64, 3, 16]]     # 2: 160 -> 160, 64
-  - [-1, 1, CBAM, [64]]                  # 3: 160 -> 160, 64, C3
-  - [-1, 1, DWSConv, [128, 3, 2]]        # 4: 160 -> 80, 128
-  - [-1, 1, DWSConv, [256, 3, 2]]        # 5: 80 -> 40, 256
-  - [-1, 1, DenseBlock, [256, 4, 24]]    # 6: 40 -> 40, 256
-  - [-1, 1, CBAM, [256]]                 # 7: 40 -> 40, 256, C4
-  - [-1, 1, DWSConv, [512, 3, 2]]        # 8: 40 -> 20, 512
-  - [-1, 1, DWSConv, [1024, 3, 2]]       # 9: 20 -> 10, 1024
-  - [-1, 1, CBAM, [1024]]                # 10: 10 -> 10, 1024, C5
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: stem (640 -> 320) , 32
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 1: 320 -> 160 , 64
+  - [-1, 1, DenseBlock, [64, 3, 16]]    # 2: 160 -> 160 , 64
+  - [-1, 1, CBAM, [64]]                 # 3: 160 -> 160, 64, 
+  - [-1, 1, DWSConv, [128, 3, 2]]       # 4: 160 -> 80, 128, c3
+  - [-1, 1, DWSConv, [256, 3, 2]]      # 5: 80 -> 40, 256
+  - [-1, 1, DenseBlock, [256, 4, 24]]   # 6: 40 -> 40 , 256
+  - [-1, 1, CBAM, [256]]                # 7: 40 -> 40, 256, C4
+  - [-1, 1, DWSConv, [512, 3, 2]]       # 8: 40 -> 20, 512
+  - [-1, 1, DenseBlock, [512, 4, 24]]       # 9: 20 -> 10, 1024
+  - [-1, 1, CBAM, [512]]               # 10: 10 -> 10, 1024, C5
 
-head:
-  - [3, 1, Conv, [128, 1, 1]]            # 11: channelshaper_64
-  - [7, 1, Conv, [128, 1, 1]]            # 12: channelshaper_256
-  - [10, 1, Conv, [128, 1, 1]]           # 13: channelshaper_1024
+# ----------------------
+# Neck + Head (Standard FPN)
+# ----------------------
+head :
+  # ===== Left Stem =====
+  - [4, 1, Conv, [128, 1, 1]]         # 11: P3_left
+  - [7, 1, Conv, [128, 1, 1]]         # 12: P1_left
+  - [10, 1, Conv, [128, 1, 1]]         # 13: P2_left
 
-  - [13, 1, nn.Upsample, [None, 2, "nearest"]]   # 14: upsample x2
-  - [12, 1, DWSConv, [128, 3, 2]]               # 15: downsample
-  - [[14, 15], 1, Concat, [1]]                  # 16
-  - [-1, 1, Conv, [128, 3, 1]]                  # 17
+  - [13, 1, nn.Upsample, [None, 4, "nearest"]]     # 14: upsample P2_left
+  - [[14, 12], 1, Concat, [1]]                     # 15: P3_left + up_P2_left
+  - [-1, 1, Conv, [128, 3, 1]]                     # 16: Fused_left_P3
+  - [16, 1, nn.Upsample, [None, 4, "nearest"]]     # 17: upsample fused left
+  - [[17, 11], 1, Concat, [1]]                     # 18: P1_left + up_P3_left
+  - [-1, 1, Conv, [128, 3, 1]]                     # 19: out_left (for head 1)
 
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 18
-  - [[12, 18], 1, Concat, [1]]                  # 19
-  - [-1, 1, Conv, [128, 3, 1]]                  # 20
+  # ===== Right Stem =====
+  - [4, 1, Conv, [128, 1, 1]]         # 20: C3 -> conv
+  - [-1, 1, SE, [128]]                # 21: attension -> P3_right
+  - [7, 1, Conv, [128, 1, 1]]         # 22: C1 -> conv
+  - [-1, 1, SE, [128]]                # 23: atttension -> P1_right
+  - [10, 1,Conv, [128, 1, 1]]         # 24: C2 -> conv
+  - [-1, 1, SE, [128]]                # 25: attension -> P2_right
 
-  - [11, 1, DWSConv, [128, 3, 2]]               # 21
-  - [20, 1, nn.Upsample, [None, 2, "nearest"]]  # 22
-  - [[21, 22], 1, Concat, [1]]                  # 23
-  - [-1, 1, Conv, [128, 3, 1]]                  # 24
+  - [25, 1, nn.Upsample, [None, 4, "nearest"]]     # 26: upsample P2_right
+  - [[26, 23], 1, Concat, [1]]                     # 27: P3_right + up_P2_right
+  - [-1, 1, Conv, [128, 3, 1]]                     # 28: Fused_right_P3
+  - [28, 1, nn.Upsample, [None, 4, "nearest"]]     # 29: upsample fused right
+  - [[29, 21], 1, Concat, [1]]                     # 30: P1_right + up_P3_right
+  - [-1, 1, Conv, [128, 3, 1]]                     # 31: out_right (for head 1)
 
-  # Right stem
-  - [3, 1, Conv, [128, 1, 1]]                   # 25
-  - [7, 1, Conv, [128, 1, 1]]                   # 26
-  - [10, 1, Conv, [128, 1, 1]]                  # 27
-  - [25, 1, SE, [128]]                          # 28
-  - [26, 1, SE, [128]]                          # 29
-  - [27, 1, SE, [128]]                          # 30
+  # ===== Fusion for other heads =====
+  - [[16, 28], 1, Concat, [1]]         # 32: head_2 input (P3 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]         # 33
+  - [[13, 25], 1, Concat, [1]]         # 34: head_3 input (P2 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]         # 35
+  - [[19, 31], 1, Concat, [1]]         # 36: head_1 input (P1 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]         # 37
 
-  - [30, 1, nn.Upsample, [None, 2, "nearest"]]  # 31
-  - [29, 1, DWSConv, [128, 3, 2]]               # 32
-  - [[31, 32], 1, Concat, [1]]                  # 33
-  - [-1, 1, Conv, [128, 3, 1]]                  # 34
-
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 35
-  - [[26, 35], 1, Concat, [1]]                  # 36
-  - [-1, 1, Conv, [128, 3, 1]]                  # 37
-
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 38
-  - [28, 1, DWSConv, [128, 3, 2]]               # 39
-  - [[38, 39], 1, Concat, [1]]                  # 40
-  - [-1, 1, Conv, [128, 3, 1]]                  # 41
-
-  - [[17, 34], 1, Concat, [1]]                  # 42
-  - [-1, 1, Conv, [128, 3, 1]]                  # 43 → P3
-
-  - [[20, 37], 1, Concat, [1]]                  # 44
-  - [-1, 1, Conv, [128, 3, 1]]                  # 45 → P4
-
-  - [[24, 41], 1, Concat, [1]]                  # 46
-  - [-1, 1, Conv, [128, 3, 1]]                  # 47 → P5
-
-  - [[43, 45, 47], 1, Detect, [nc]]            # 48: Final detect
+  # ===== Detect Layer =====
+  - [[33, 35, 37], 1, Detect, [nc]]    # 41: Final detect
