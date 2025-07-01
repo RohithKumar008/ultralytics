@@ -51,4 +51,4 @@ head :
   - [-1, 1, Conv, [128, 3, 1]]         # 33
 
   # ===== Detect Layer =====
-  - [[33, 35, 37], 1, Detect, [nc]]    # 34: Final detect
+  - [[29, 31, 33], 1, Detect, [nc]]    # 34: Final detect
