@@ -54,14 +54,14 @@ head :
   - [-1, 1, Conv, [128, 3, 1]]                     # 38: 
 
   # ===== Fusion for other heads =====
-  - [[16, 29], 1,  GatedFusion, [128]]         # 37: head_2 input (P3 fusion)
-  - [-1, 1, Conv, [128, 3, 1]]                 # 39
-  - [[25, 38], 1,  GatedFusion, [128]]         # 40: head_2 input (P3 fusion)
-  - [-1, 1, Conv, [128, 3, 1]]                 # 41
-  - [[22, 35], 1,  GatedFusion, [128]]         # 42: head_3 input (P2 fusion)
-  - [-1, 1, Conv, [128, 3, 1]]                 # 43
-  - [[19, 32], 1,  GatedFusion, [128]]         # 44: head_1 input (P1 fusion)
-  - [-1, 1, Conv, [128, 3, 1]]                 # 45
+  - [[16, 29], 1,  GatedFusion, [128]]         # 39: head_2 input (P3 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]                 # 40
+  - [[25, 38], 1,  GatedFusion, [128]]         # 41: head_2 input (P3 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]                 # 42
+  - [[22, 35], 1,  GatedFusion, [128]]         # 43: head_3 input (P2 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]                 # 44
+  - [[19, 32], 1,  GatedFusion, [128]]         # 45: head_1 input (P1 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]                 # 46
 
   # ===== Detect Layer =====
-  - [[39, 41, 43, 45], 1, Detect, [nc]]    # 41: Final detect
+  - [[40, 42, 44, 46], 1, Detect, [nc]]    # 41: Final detect
