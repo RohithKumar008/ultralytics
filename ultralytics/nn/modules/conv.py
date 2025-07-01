@@ -26,6 +26,7 @@ __all__ = (
     "Index",
     "DynamicRouting",
     "CrossAttentionFuse"
+    "EMSA"
     "TripletAttention",
     "GatedFusion",
     "DWSConv",
@@ -1335,6 +1336,51 @@ class DynamicRouting(nn.Module):
         cond = self.cond(self.avgpool(condition_source))
         return self.project(x_input * cond)
 
+class EMSA(nn.Module):
+    def __init__(self, channels, c2=None, num_heads=4, sr_ratio=1):
+        super().__init__()
+        self.num_heads = num_heads
+        self.sr_ratio = sr_ratio
+        self.dim = channels
+        self.head_dim = channels // num_heads
+        self.scale = self.head_dim ** -0.5
+
+        self.q = nn.Linear(channels, channels)
+        self.kv = nn.Linear(channels, channels * 2)
+        self.proj = nn.Linear(channels, channels)
+
+        if sr_ratio > 1:
+            self.sr = nn.Conv2d(channels, channels, kernel_size=sr_ratio, stride=sr_ratio)
+            self.norm = nn.LayerNorm(channels)
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        N = H * W
+        x_flat = x.flatten(2).transpose(1, 2)  # (B, N, C)
+
+        q = self.q(x_flat).reshape(B, N, self.num_heads, self.head_dim).transpose(1, 2)  # (B, heads, N, d)
+
+        if self.sr_ratio > 1:
+            x_ = self.sr(x)  # (B, C, H/s, W/s)
+            x_ = x_.flatten(2).transpose(1, 2)  # (B, N', C)
+            x_ = self.norm(x_)
+            kv = self.kv(x_)
+        else:
+            kv = self.kv(x_flat)
+
+        k, v = kv.chunk(2, dim=-1)
+        k = k.reshape(B, -1, self.num_heads, self.head_dim).transpose(1, 2)  # (B, heads, N', d)
+        v = v.reshape(B, -1, self.num_heads, self.head_dim).transpose(1, 2)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale  # (B, heads, N, N')
+        attn = attn.softmax(dim=-1)
+
+        out = (attn @ v).transpose(1, 2).reshape(B, N, C)  # (B, N, C)
+        out = self.proj(out)
+
+        out = out.transpose(1, 2).reshape(B, C, H, W)  # (B, C, H, W)
+        return out
+globals()['EMSA'] = EMSA
 globals()['DynamicRouting'] = DynamicRouting
 globals()['CrossAttentionFuse'] = CrossAttentionFuse
 globals()['TripletAttention'] = TripletAttention
