@@ -57,6 +57,7 @@ from ultralytics.nn.modules import (
     ImagePoolingAttn,
     Index,
     TripletAttention,
+    EMSA,
     DynamicRouting,
     CrossAttentionFuse,
     GatedFusion,
@@ -92,6 +93,7 @@ from ultralytics.nn.modules import (
     v10Detect,
 )
 
+globals()['EMSA'] = EMSA
 globals()['DynamicRouting'] = DynamicRouting
 globals()['CrossAttentionFuse'] = CrossAttentionFuse
 globals()['TripletAttention'] = TripletAttention
@@ -1662,6 +1664,7 @@ def parse_model(d, ch, verbose=True):
             C2PSA,
             DWConv,
             TripletAttention,
+            EMSA,
             DWSConv,
             DenseBlock,
             CondConv,
