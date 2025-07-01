@@ -58,6 +58,7 @@ from ultralytics.nn.modules import (
     Index,
     TripletAttention,
     EMSA,
+    ConvNeXtBlock,
     DynamicRouting,
     CrossAttentionFuse,
     GatedFusion,
@@ -93,6 +94,7 @@ from ultralytics.nn.modules import (
     v10Detect,
 )
 
+globals()['ConvNeXtBlock'] = ConvNeXtBlock
 globals()['EMSA'] = EMSA
 globals()['DynamicRouting'] = DynamicRouting
 globals()['CrossAttentionFuse'] = CrossAttentionFuse
@@ -1665,6 +1667,7 @@ def parse_model(d, ch, verbose=True):
             DWConv,
             TripletAttention,
             EMSA,
+            ConvNeXtBlock,
             DWSConv,
             DenseBlock,
             CondConv,
