@@ -28,7 +28,7 @@ head :
   - [14, 1, nn.Upsample, [None, 2, "nearest"]]     # 15: upsample P2_left
   - [[15, 13], 1,  GatedFusion, [128]]             # 16: P3_left + up_P2_left
   - [-1, 1, Conv, [128, 3, 1]]                     # 17: Fused_left_P3
-  - [17, 1, nn.Upsample, [None, 4, "nearest"]]     # 18: upsample fused left
+  - [17, 1, nn.Upsample, [None, 2, "nearest"]]     # 18: upsample fused left
   - [[18, 12], 1, GatedFusion, [128]]              # 19: P1_left + up_P3_left
   - [-1, 1, Conv, [128, 3, 1]]                     # 20: out_left (for head 1)
   - [20, 1, nn.Upsample, [None, 2, "nearest"]]     # 21: upsample P2_left
@@ -44,7 +44,7 @@ head :
   - [27, 1, nn.Upsample, [None, 2, "nearest"]]     # 28: upsample P2_left
   - [[28, 26], 1,  GatedFusion, [128]]             # 29: P3_left + up_P2_left
   - [-1, 1, Conv, [128, 3, 1]]                     # 30: Fused_left_P3
-  - [30, 1, nn.Upsample, [None, 4, "nearest"]]     # 31: upsample fused left
+  - [30, 1, nn.Upsample, [None, 2, "nearest"]]     # 31: upsample fused left
   - [[31, 25], 1, GatedFusion, [128]]              # 32: P1_left + up_P3_left
   - [-1, 1, Conv, [128, 3, 1]]                     # 33: out_left (for head 1)
   - [33, 1, nn.Upsample, [None, 2, "nearest"]]     # 34: upsample P2_left
