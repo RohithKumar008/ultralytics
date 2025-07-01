@@ -16,7 +16,7 @@ backbone:
   - [-1, 1, TripletAttention, [256]]    # 9: 256, C4
   - [-1, 1, DWSConv, [512, 3, 2]]       # 10:512
   - [-1, 1, DenseBlock, [512, 4, 24]]   # 11:512
-  - [-1, 1, EMSA, [512]]                # 12:512 ,C5
+  - [-1, 1, TripletAttention, [512]]    # 12:512 ,C5
 
 # ----------------------
 # Neck + Head (Standard FPN)
