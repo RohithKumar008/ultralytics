@@ -28,6 +28,7 @@ __all__ = (
     "CrossAttentionFuse"
     "EMSA"
     "TripletAttention",
+    "ConvNeXtBlock",
     "GatedFusion",
     "DWSConv",
     "CondConv",
@@ -1380,6 +1381,39 @@ class EMSA(nn.Module):
 
         out = out.transpose(1, 2).reshape(B, C, H, W)  # (B, C, H, W)
         return out
+import torch
+import torch.nn as nn
+
+class ConvNeXtBlock(nn.Module):
+    def __init__(self, channels, c2=None, drop_path=0.0, layer_scale_init_value=1e-6):
+        super().__init__()
+        self.dwconv = nn.Conv2d(channels, channels, kernel_size=7, padding=3, groups=channels)  # depthwise conv
+        self.norm = nn.LayerNorm(channels, eps=1e-6)
+        self.pwconv1 = nn.Linear(channels, 4 * channels)  # pointwise/1x1 convs (implemented as Linear for LayerNorm support)
+        self.act = nn.GELU()
+        self.pwconv2 = nn.Linear(4 * channels, channels)
+        self.gamma = nn.Parameter(layer_scale_init_value * torch.ones((channels)), requires_grad=True) if layer_scale_init_value > 0 else None
+        self.drop_path = nn.Identity()  # optionally use DropPath(drop_path) if needed
+
+    def forward(self, x):
+        input = x
+        x = self.dwconv(x)  # B, C, H, W
+
+        # Permute for LayerNorm
+        x = x.permute(0, 2, 3, 1)  # B, H, W, C
+        x = self.norm(x)
+        x = self.pwconv1(x)
+        x = self.act(x)
+        x = self.pwconv2(x)
+
+        if self.gamma is not None:
+            x = self.gamma * x
+
+        x = x.permute(0, 3, 1, 2)  # B, C, H, W
+
+        return input + self.drop_path(x)
+ConvNeXtBlock
+globals()['ConvNeXtBlock'] = ConvNeXtBlock
 globals()['EMSA'] = EMSA
 globals()['DynamicRouting'] = DynamicRouting
 globals()['CrossAttentionFuse'] = CrossAttentionFuse
