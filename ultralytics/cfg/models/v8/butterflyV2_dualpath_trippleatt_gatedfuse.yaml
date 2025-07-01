@@ -1,0 +1,58 @@
+
+# ----------------------
+# Custom Backbone
+# ----------------------
+nc: 3
+backbone:
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: 32
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 1: 64
+  - [-1, 1, DenseBlock, [64, 3, 16]]    # 2: 64
+  - [-1, 1, TripletAttention, [64]]     # 3: 64, C2
+  - [-1, 1, DWSConv, [128, 3, 2]]       # 4: 128
+  - [-1, 1, DenseBlock, [128, 3, 16]]   # 5: 128
+  - [-1, 1, TripletAttention, [128]]    # 6: 128, C3
+  - [-1, 1, DWSConv, [256, 3, 2]]       # 7: 256
+  - [-1, 1, DenseBlock, [256, 4, 24]]   # 8: 256
+  - [-1, 1, TripletAttention, [256]]    # 9: 256, C4
+  - [-1, 1, DWSConv, [512, 3, 2]]       # 10:512
+  - [-1, 1, DenseBlock, [512, 4, 24]]   # 11:512
+  - [-1, 1, EMSA, [512]]                # 12:512 ,C5
+
+# ----------------------
+# Neck + Head (Standard FPN)
+# ----------------------
+head :
+  # ===== Left Stem =====
+  - [6, 1, Conv, [128, 1, 1]]           # 13: 
+  - [9, 1, Conv, [128, 1, 1]]           # 14: 
+  - [12, 1, Conv, [128, 1, 1]]          # 15: 
+
+  - [15, 1, nn.Upsample, [None, 2, "nearest"]]     # 16: upsample P2_left
+  - [[16, 14], 1,  GatedFusion, [128]]             # 17: P3_left + up_P2_left
+  - [-1, 1, Conv, [128, 3, 1]]                     # 18: Fused_left_P3
+  - [18, 1, nn.Upsample, [None, 2, "nearest"]]     # 19: upsample fused left
+  - [[19, 13], 1, GatedFusion, [128]]              # 20: P1_left + up_P3_left
+  - [-1, 1, Conv, [128, 3, 1]]                     # 21: out_left (for head 1)
+
+  # ===== Right Stem =====
+  - [13, 1, SE, [128]]                # 22: attension -> P3_right
+  - [14, 1, SE, [128]]                # 23: atttension -> P1_right
+  - [15, 1, SE, [128]]                # 24: attension -> P2_right
+
+  - [24, 1, nn.Upsample, [None, 2, "nearest"]]     # 25: upsample P2_right
+  - [[25, 23], 1,  GatedFusion, [128]]             # 26: P3_right + up_P2_right
+  - [-1, 1, Conv, [128, 3, 1]]                     # 27: Fused_right_P3
+  - [27, 1, nn.Upsample, [None, 2, "nearest"]]     # 28: upsample fused right
+  - [[28, 22], 1,  GatedFusion, [128]]             # 29: P1_right + up_P3_right
+  - [-1, 1, Conv, [128, 3, 1]]                     # 30: out_right (for head 1)
+
+  # ===== Fusion for other heads =====
+  - [[15, 24], 1,  GatedFusion, [128]]         # 31: head_2 input (P3 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]                 # 32
+  - [[18, 27], 1,  GatedFusion, [128]]         # 33: head_3 input (P2 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]                 # 34
+  - [[21, 30], 1,  GatedFusion, [128]]         # 35: head_1 input (P1 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]                 # 36
+
+  # ===== Detect Layer =====
+  - [[32, 34, 36], 1, Detect, [nc]]    # 41: Final detect
