@@ -3,38 +3,52 @@
 # ----------------------
 nc: 3
 backbone:
-  # Stem + Stages (DWS, SE, CondConv, etc.)
-  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: Stem (640 → 320)
-  - [-1, 1, DWSConv, [48, 3, 2]]        # 1: Stage 1 (320 → 160)
-  - [-1, 1, DWSConv, [64, 3, 2]]        # 2: Stage 2 (160 → 80)
-  - [-1, 1, SE, [64]]                    # 3
-  - [-2, 1, DWSConv, [128, 3, 2]]       # 4: Stage 3 (80 → 40)
-  - [-1, 1, SE, [128]]                   # 5 → C3
-  - [-1, 1, CondConv, [256, 3, 2]]      # 6: Stage 4 (40 → 20)
-  - [-1, 1, SE, [256]]                   # 7 → C4
-  - [-1, 1, DeformableConv, [512, 3, 2]] # 8: Stage 5 (20 → 10)
-  - [-1, 1, CBAM, [512]]                 # 9
-  - [-1, 1, DeformableConv, [512, 3, 1]] # 10: Stage 6 (10 → 10)
-  - [-1, 1, CBAM, [512]]                 # 11 → C5
+  - [-1, 1, DWSConv, [32, 3, 2]]        # 0: stem (640 -> 320) , 32
+  - [-1, 1, DWSConv, [64, 3, 2]]        # 1: 320 -> 160 , 64
+  - [-1, 1, DenseBlock, [64, 3, 16]]    # 2: 160 -> 160 , 64
+  - [-1, 1, DWSConv, [128, 3, 2]]       # 3: 160 -> 80, 128
+  - [-1, 1, DWSConv, [256, 3, 2]]      # 4: 80 -> 40, 256
+  - [-1, 1, DenseBlock, [256, 4, 24]]   # 5: 40 -> 40 , 256
+  - [-1, 1, TripletAttention, [256]]    # 6: 40 -> 40, 256, C4
+  - [-1, 1, DWSConv, [512, 3, 2]]       # 7: 40 -> 20, 512
+  - [-1, 1, DenseBlock, [512, 4, 24]]      # 8: 20 -> 20, 1024
+  - [-1, 1, TripletAttention, [1024]]    # 9: 20 -> 20, 1024, C5
 
 # ----------------------
 # Neck + Head (Standard FPN)
 # ----------------------
-head:
-  # Reduce channels to 128 for all three layers C3, C4, C5
-  - [5, 1, Conv, [128, 1, 1]]          # 12: C3 reduced → p3
-  - [7, 1, Conv, [128, 1, 1]]          # 13: C4 reduced → p4
-  - [11, 1, Conv, [128, 1, 1]]         # 14: C5 reduced → p5
+head :
+  # ===== Left Stem =====
+  - [3, 1, Conv, [128, 1, 1]]         # 10: P3_left
+  - [6, 1, Conv, [128, 1, 1]]         # 11: P1_left
+  - [9, 1, Conv, [128, 1, 1]]         # 12: P2_left
 
-  # Upsample p5 and concat with p4
-  - [14, 1, nn.Upsample, [None, 2, "nearest"]] # 15: upsample p5
-  - [[13, 15], 1, Concat, [1]]         # 16: concat p4 and upsampled p5
-  - [-1, 1, Conv, [128, 3, 1]]         # 17: fused p4
+  - [12, 1, nn.Upsample, [None, 2, "nearest"]]     # 13: upsample P2_left
+  - [[13, 11], 1,  GatedFusion, [128]]             # 14: P3_left + up_P2_left
+  - [-1, 1, Conv, [128, 3, 1]]                     # 15: Fused_left_P3
+  - [15, 1, nn.Upsample, [None, 2, "nearest"]]     # 16: upsample fused left
+  - [[16, 10], 1, GatedFusion, [128]]              # 17: P1_left + up_P3_left
+  - [-1, 1, Conv, [128, 3, 1]]                     # 18: out_left (for head 1)
 
-  # Upsample fused p4 and concat with p3
-  - [17, 1, nn.Upsample, [None, 2, "nearest"]] # 18: upsample fused p4
-  - [[12, 18], 1, Concat, [1]]         # 19: concat p3 and upsampled p4
-  - [-1, 1, Conv, [128, 3, 1]]         # 20: fused p3
+  # ===== Right Stem =====
+  - [10, 1, SE, [128]]                # 19: attension -> P3_right
+  - [11, 1, SE, [128]]                # 20: atttension -> P1_right
+  - [12, 1, SE, [128]]                # 21: attension -> P2_right
 
-  # Final Detect layer using p3 (40×40), p4 (20×20), p5 (10×10)
-  - [[20, 17, 14], 1, Detect, [nc]]    # 21: detect heads on P3, P4, P5
+  - [21, 1, nn.Upsample, [None, 2, "nearest"]]     # 22: upsample P2_right
+  - [[22, 20], 1,  GatedFusion, [128]]             # 23: P3_right + up_P2_right
+  - [-1, 1, Conv, [128, 3, 1]]                     # 24: Fused_right_P3
+  - [24, 1, nn.Upsample, [None, 2, "nearest"]]     # 25: upsample fused right
+  - [[25, 19], 1,  GatedFusion, [128]]             # 26: P1_right + up_P3_right
+  - [-1, 1, Conv, [128, 3, 1]]                     # 27: out_right (for head 1)
+
+  # ===== Fusion for other heads =====
+  - [[12, 21], 1,  GatedFusion, [128]]         # 28:  (P3 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]         # 29
+  - [[15, 24], 1,  GatedFusion, [128]]         # 30: (P2 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]         # 31
+  - [[18, 27], 1,  GatedFusion, [128]]         # 32:  (P1 fusion)
+  - [-1, 1, Conv, [128, 3, 1]]         # 33
+
+  # ===== Detect Layer =====
+  - [[33, 35, 37], 1, Detect, [nc]]    # 34: Final detect
