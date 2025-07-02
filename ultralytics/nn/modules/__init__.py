@@ -16,7 +16,7 @@ Examples:
     >>> torch.onnx.export(m, x, f)
     >>> os.system(f"onnxslim {f} {f} && open {f}")  # pip install onnxslim
 """
-from .detr import DETRHead
+
 from .custom import AddBlock
 from .block import (
     C1,
@@ -182,7 +182,6 @@ __all__ = (
     "Bottleneck",
     "BottleneckCSP",
     "Proto",
-    "DETRHead",
     "Detect",
     "Segment",
     "Pose",
