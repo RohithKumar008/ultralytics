@@ -1680,7 +1680,6 @@ def parse_model(d, ch, verbose=True):
             SwinTransformerC,
             SwinTransformerBlock,
             Add,
-            AddBlock,
             Focus,
             BottleneckCSP,
             C1,
