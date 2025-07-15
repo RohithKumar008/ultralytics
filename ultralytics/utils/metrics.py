@@ -330,7 +330,7 @@ class ConfusionMatrix(DataExportMixin):
         """
         self.task = task
         self.nc = len(names)  # number of classes
-        self.matrix = np.zeros((self.nc + 1, self.nc + 1)) if self.task == "detect" else np.zeros((self.nc, self.nc))
+        self.matrix = np.zeros((self.nc, self.nc)) if self.task == "classify" else np.zeros((self.nc + 1, self.nc + 1))
         self.names = names  # name of classes
 
     def process_cls_preds(self, preds, targets):
@@ -360,8 +360,9 @@ class ConfusionMatrix(DataExportMixin):
             conf (float, optional): Confidence threshold for detections.
             iou_thres (float, optional): IoU threshold for matching detections to ground truth.
         """
-        conf = 0.25 if conf in {None, 0.001} else conf  # apply 0.25 if default val conf is passed
         gt_cls, gt_bboxes = batch["cls"], batch["bboxes"]
+        is_obb = gt_bboxes.shape[1] == 5  # check if boxes contains angle for OBB
+        conf = 0.25 if conf in {None, 0.01 if is_obb else 0.001} else conf  # apply 0.25 if default val conf is passed
         no_pred = len(detections["cls"]) == 0
         if gt_cls.shape[0] == 0:  # Check if labels is empty
             if not no_pred:
@@ -380,7 +381,6 @@ class ConfusionMatrix(DataExportMixin):
         gt_classes = gt_cls.int().tolist()
         detection_classes = detections["cls"].int().tolist()
         bboxes = detections["bboxes"]
-        is_obb = bboxes.shape[1] == 5  # check if detections contains angle for OBB
         iou = batch_probiou(gt_bboxes, bboxes) if is_obb else box_iou(gt_bboxes, bboxes)
 
         x = torch.where(iou > iou_thres)
@@ -422,7 +422,7 @@ class ConfusionMatrix(DataExportMixin):
         tp = self.matrix.diagonal()  # true positives
         fp = self.matrix.sum(1) - tp  # false positives
         # fn = self.matrix.sum(0) - tp  # false negatives (missed detections)
-        return (tp[:-1], fp[:-1]) if self.task == "detect" else (tp, fp)  # remove background class if task=detect
+        return (tp, fp) if self.task == "classify" else (tp[:-1], fp[:-1])  # remove background class if task=detect
 
     @TryExcept(msg="ConfusionMatrix plot failure")
     @plt_settings()
@@ -441,16 +441,15 @@ class ConfusionMatrix(DataExportMixin):
         array[array < 0.005] = np.nan  # don't annotate (would appear as 0.00)
 
         fig, ax = plt.subplots(1, 1, figsize=(12, 9))
+        names, n = self.names, self.nc
         if self.nc >= 100:  # downsample for large class count
             k = max(2, self.nc // 60)  # step size for downsampling, always > 1
             keep_idx = slice(None, None, k)  # create slice instead of array
-            self.names = self.names[keep_idx]  # slice class names
+            names = names[keep_idx]  # slice class names
             array = array[keep_idx, :][:, keep_idx]  # slice matrix rows and cols
             n = (self.nc + k - 1) // k  # number of retained classes
-            nc = nn = n if self.task == "classify" else n + 1  # adjust for background if needed
-        else:
-            nc = nn = self.nc if self.task == "classify" else self.nc + 1
-        ticklabels = (self.names + ["background"]) if (0 < nn < 99) and (nn == nc) else "auto"
+        nc = nn = n if self.task == "classify" else n + 1  # adjust for background if needed
+        ticklabels = (names + ["background"]) if (0 < nn < 99) and (nn == nc) else "auto"
         xy_ticks = np.arange(len(ticklabels))
         tick_fontsize = max(6, 15 - 0.1 * nc)  # Minimum size is 6
         label_fontsize = max(6, 12 - 0.1 * nc)
