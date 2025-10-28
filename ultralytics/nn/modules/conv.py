@@ -1412,7 +1412,7 @@ class ConvNeXtBlock(nn.Module):
         x = x.permute(0, 3, 1, 2)  # B, C, H, W
 
         return input + self.drop_path(x)
-ConvNeXtBlock
+        
 globals()['ConvNeXtBlock'] = ConvNeXtBlock
 globals()['EMSA'] = EMSA
 globals()['DynamicRouting'] = DynamicRouting
