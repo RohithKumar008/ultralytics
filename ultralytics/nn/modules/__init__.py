@@ -96,6 +96,7 @@ from .conv import (
     SwinTransformerC,
     SwinTransformerBlock,
 )
+from .custom_enhancements import AdaptivePerChannelGamma, LearnableCLAHE, TrainableRetinex
 from .head import (
     OBB,
     Classify,
@@ -219,4 +220,7 @@ __all__ = (
     "TorchVision",
     "Index",
     "A2C2f",
+    "AdaptivePerChannelGamma",
+    "LearnableCLAHE",
+    "TrainableRetinex",
 )
