@@ -11,12 +11,26 @@ import torch.nn.functional as F
 class AdaptivePerChannelGamma(nn.Module):
     """Safe identity module for testing - pure pass-through."""
 
-    def __init__(self, c1: int, c2: int = None, num_channels: int = None):
+    def __init__(self, c1: int, c2: int = None, *args, **kwargs):
         super().__init__()
-        # No parameters at all - pure identity
+        # If c2 not specified, use c1 (true identity)
+        if c2 is None:
+            c2 = c1
+        
+        # Store channel info but create no parameters for identity case
+        self.c1 = c1
+        self.c2 = c2
+        
+        # If c1 != c2, we need a projection layer
+        if c1 != c2:
+            self.proj = nn.Conv2d(c1, c2, 1, bias=False)
+        else:
+            self.proj = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return x  # Always pass through unchanged
+        if self.proj is not None:
+            return self.proj(x)
+        return x  # Pure pass-through when c1 == c2
 
 
 class LearnableCLAHE(nn.Module):
