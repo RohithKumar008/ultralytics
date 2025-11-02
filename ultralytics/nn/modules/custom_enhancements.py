@@ -27,23 +27,25 @@ class AdaptivePerChannelGamma(nn.Module):
         else:
             self.proj = None
         
-        # Adaptive gamma computation (using c2 for output channels)
-        self.fc = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
-            nn.Linear(c2, c2),
-            nn.Sigmoid()
-        )
+        # Simplified approach: Use global average pooling + per-channel learnable gamma
+        # This avoids the dimension mismatch issue entirely
         self.base_gamma = nn.Parameter(torch.ones(c2))
+        self.adaptive_weight = nn.Parameter(torch.ones(c2) * 0.1)  # Small adaptive component
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Apply projection if needed
         if self.proj is not None:
             x = self.proj(x)
         
-        # Adaptive gamma correction
-        gamma_scale = self.fc(x)  # adaptive factor based on global stats
-        gamma = torch.clamp(self.base_gamma * (0.5 + gamma_scale), 0.5, 2.0)
+        # Simple adaptive gamma based on global average per channel
+        global_avg = torch.mean(x, dim=(2, 3), keepdim=False)  # [B, C]
+        global_avg = torch.mean(global_avg, dim=0)  # [C] - average across batch
+        
+        # Compute adaptive gamma (simpler and more stable)
+        adaptive_factor = torch.sigmoid(self.adaptive_weight * global_avg)
+        gamma = torch.clamp(self.base_gamma * (0.5 + adaptive_factor), 0.5, 2.0)
+        
+        # Apply gamma correction
         out = torch.pow(x + 1e-6, gamma.view(1, -1, 1, 1))
         return out
 
