@@ -9,26 +9,14 @@ import torch.nn.functional as F
 
 
 class AdaptivePerChannelGamma(nn.Module):
-    """Adaptive per-channel gamma correction compatible with parse_model.
-
-    Simplified stable version that acts as a learnable residual connection.
-    """
+    """Safe identity module for testing - pure pass-through."""
 
     def __init__(self, c1: int, c2: int = None, num_channels: int = None):
         super().__init__()
-        ch = c2 if c2 is not None else c1
-        
-        # Simple learnable scale factor per channel (initialized near 1.0)
-        self.scale = nn.Parameter(torch.ones(ch) * 0.95)
-        self.enabled = False  # Can be set to True after initial training
+        # No parameters at all - pure identity
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if not self.enabled:
-            return x  # Pass through during initial training
-            
-        # Simple channel-wise scaling with residual
-        scale_clamped = torch.clamp(self.scale, 0.8, 1.2)
-        return x * scale_clamped.view(1, -1, 1, 1)
+        return x  # Always pass through unchanged
 
 
 class LearnableCLAHE(nn.Module):
