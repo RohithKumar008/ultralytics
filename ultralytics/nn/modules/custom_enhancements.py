@@ -2,6 +2,7 @@
 
 This file contains YAML-friendly versions of enhancement modules adapted to
 the model parser expectations (i.e. constructors accept c1, c2, ...).
+Includes PSM (Dynamic Feature Extraction Module) from DarkYOLO paper.
 """
 import torch
 import torch.nn as nn
@@ -146,3 +147,155 @@ class TrainableRetinex(nn.Module):
             out.append(enhanced)
         out = torch.cat(out, dim=1)
         return torch.clamp(out, -2, 2)  # optional normalization
+
+
+class SimAM(nn.Module):
+    """Parameter-free SimAM attention mechanism from DarkYOLO PSM block.
+    
+    Generates 3D attention weights without additional parameters by evaluating
+    local self-similarity of feature maps.
+    """
+    
+    def __init__(self, lambda_reg=1e-4):
+        super().__init__()
+        self.lambda_reg = lambda_reg
+    
+    def forward(self, x):
+        B, C, H, W = x.shape
+        # Flatten spatial dimensions for easier computation
+        x_flat = x.view(B, C, -1)  # [B, C, H*W]
+        
+        # Compute mean and variance per channel
+        mu = torch.mean(x_flat, dim=2, keepdim=True)  # [B, C, 1]
+        var = torch.var(x_flat, dim=2, keepdim=True)  # [B, C, 1]
+        
+        # Compute energy function for each neuron (Equation 9)
+        # e_i = 4(σ + λ) / [(t_i - μ)² + 2σ² + 2λ]
+        numerator = 4 * (var + self.lambda_reg)
+        denominator = (x_flat - mu) ** 2 + 2 * var + 2 * self.lambda_reg
+        energy = numerator / (denominator + 1e-8)  # Add small epsilon for stability
+        
+        # Generate attention weights (Equation 10)
+        # X' = sigmoid(1/e_i) * X
+        attention = torch.sigmoid(1.0 / (energy + 1e-8))
+        attention = attention.view(B, C, H, W)
+        
+        return x * attention
+
+
+class PartialConv2d(nn.Module):
+    """Partial Convolution that processes only valid pixels.
+    
+    Applies convolution to only a subset of input channels while leaving
+    others unchanged, reducing computational load for low-light conditions.
+    """
+    
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, 
+                 padding=1, bias=True, partial_ratio=0.5):
+        super().__init__()
+        self.partial_channels = max(1, int(in_channels * partial_ratio))
+        self.remaining_channels = in_channels - self.partial_channels
+        
+        # Convolution applied only to partial channels
+        self.partial_conv = nn.Conv2d(
+            self.partial_channels, out_channels - self.remaining_channels,
+            kernel_size, stride, padding, bias=bias
+        )
+        
+    def forward(self, x):
+        # Split input into partial and remaining channels
+        x_partial = x[:, :self.partial_channels, :, :]
+        x_remaining = x[:, self.partial_channels:, :, :]
+        
+        # Apply convolution only to partial channels
+        x_partial_out = self.partial_conv(x_partial)
+        
+        # Concatenate processed partial channels with unchanged remaining channels
+        return torch.cat([x_partial_out, x_remaining], dim=1)
+
+
+class PSMBlock(nn.Module):
+    """Dynamic Feature Extraction Module (PSM) from DarkYOLO.
+    
+    Integrates parameter-free SimAM attention with partial convolution
+    for enhanced low-light feature extraction.
+    """
+    
+    def __init__(self, c1, c2, n=1, partial_ratio=0.5, lambda_reg=1e-4):
+        super().__init__()
+        self.c1 = c1
+        self.c2 = c2
+        
+        # If c1 != c2, we need a projection layer
+        if c1 != c2:
+            self.proj = nn.Conv2d(c1, c2, 1, bias=False)
+        else:
+            self.proj = None
+        
+        # Initial feature extraction (2D convolution)
+        self.initial_conv = nn.Conv2d(c2, c2, 3, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(c2)
+        
+        # Split into multiple branches for feature extraction
+        self.branch_channels = c2 // 4
+        self.branches = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(c2, self.branch_channels, 1, bias=False),
+                nn.BatchNorm2d(self.branch_channels),
+                nn.SiLU()
+            ),
+            nn.Sequential(
+                nn.Conv2d(c2, self.branch_channels, 3, padding=1, bias=False),
+                nn.BatchNorm2d(self.branch_channels),
+                nn.SiLU()
+            ),
+            nn.Sequential(
+                nn.Conv2d(c2, self.branch_channels, 3, padding=2, dilation=2, bias=False),
+                nn.BatchNorm2d(self.branch_channels),
+                nn.SiLU()
+            ),
+            nn.Sequential(
+                nn.Conv2d(c2, self.branch_channels, 3, padding=3, dilation=3, bias=False),
+                nn.BatchNorm2d(self.branch_channels),
+                nn.SiLU()
+            )
+        ])
+        
+        # Parameter-free SimAM attention
+        self.attention = SimAM(lambda_reg=lambda_reg)
+        
+        # Partial convolution for refinement
+        self.partial_conv = PartialConv2d(
+            c2, c2, kernel_size=3, padding=1, partial_ratio=partial_ratio
+        )
+        
+        # Final fusion layer
+        self.fusion_conv = nn.Conv2d(c2, c2, 1, bias=False)
+        self.bn2 = nn.BatchNorm2d(c2)
+        self.act = nn.SiLU()
+    
+    def forward(self, x):
+        # Apply projection if needed
+        if self.proj is not None:
+            x = self.proj(x)
+        
+        # Initial feature extraction
+        x = self.act(self.bn1(self.initial_conv(x)))
+        
+        # Multi-branch feature extraction
+        branch_outputs = []
+        for branch in self.branches:
+            branch_outputs.append(branch(x))
+        
+        # Concatenate branch outputs
+        multi_scale_features = torch.cat(branch_outputs, dim=1)
+        
+        # Apply SimAM attention mechanism
+        attended_features = self.attention(multi_scale_features)
+        
+        # Apply partial convolution for refinement
+        refined_features = self.partial_conv(attended_features)
+        
+        # Final fusion and residual connection
+        output = self.act(self.bn2(self.fusion_conv(refined_features)))
+        return output + x  # Residual connection
