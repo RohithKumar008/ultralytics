@@ -152,10 +152,11 @@ class TrainableRetinex(nn.Module):
 class CSPPF(nn.Module):
     """Cross-Spatial Pyramid Pooling Feature (CSPPF) module from DarkYOLO.
     
-    Employs overlapping pooling strategy combining max and average pooling
-    to preserve local information in low-light images. Uses two parallel pathways:
-    - Pathway 1: Max -> Max -> Avg pooling sequence
-    - Pathway 2: Avg -> Avg -> Max pooling sequence
+    Implementation based on the diagram in Figure 3, which shows the actual architecture
+    used in the paper (equations and text descriptions have inconsistencies).
+    
+    Architecture follows the visual diagram with multiple concatenation points
+    and interconnected pooling operations for enhanced low-light feature extraction.
     """
     
     def __init__(self, c1, c2, k=5):
@@ -168,16 +169,16 @@ class CSPPF(nn.Module):
         else:
             self.proj = None
         
-        # Initial convolution (Equation 4: x = Conv(xinput))
+        # Initial convolution as shown in diagram
         self.cv1 = nn.Conv2d(c2, c_, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(c_)
         
-        # Pooling operations for both pathways
-        self.maxpool1 = nn.MaxPool2d(kernel_size=k, stride=1, padding=k//2)
-        self.avgpool1 = nn.AvgPool2d(kernel_size=k, stride=1, padding=k//2)
+        # Pooling operations (using same kernel size for all)
+        self.maxpool = nn.MaxPool2d(kernel_size=k, stride=1, padding=k//2)
+        self.avgpool = nn.AvgPool2d(kernel_size=k, stride=1, padding=k//2)
         
-        # Final convolution to combine all concatenated features
-        # Input channels: c_ (original) + 6*c_ (from 6 pooling operations) = 7*c_
+        # Final convolution - input channels based on diagram concatenations
+        # From diagram: original x + 6 pooling outputs = 7 feature maps
         self.cv2 = nn.Conv2d(7 * c_, c2, 1, bias=False)
         self.bn2 = nn.BatchNorm2d(c2)
         self.act = nn.SiLU()
@@ -187,33 +188,31 @@ class CSPPF(nn.Module):
         if self.proj is not None:
             x = self.proj(x)
         
-        # Initial convolution (Equation 4)
+        # Initial convolution
         x = self.act(self.bn1(self.cv1(x)))
         
-        # Pathway 1: Max -> Max -> Avg sequence
-        max1_x = self.maxpool1(x)                    # First max pooling
-        max2_x = self.maxpool1(max1_x)               # Second max pooling  
-        avg_after_max2 = self.avgpool1(max2_x)      # Average after two max
+        # Following the diagram architecture:
+        # Upper branch: Max -> Avg -> Max
+        upper_max1 = self.maxpool(x)
+        upper_avg = self.avgpool(upper_max1)  
+        upper_max2 = self.maxpool(upper_avg)
         
-        # Pathway 2: Avg -> Avg -> Max sequence  
-        avg1_x = self.avgpool1(x)                    # First average pooling
-        avg2_x = self.avgpool1(avg1_x)               # Second average pooling
-        max_after_avg2 = self.maxpool1(avg2_x)      # Max after two average
+        # Lower branch: Avg -> Max -> Avg  
+        lower_avg1 = self.avgpool(x)
+        lower_max = self.maxpool(lower_avg1)
+        lower_avg2 = self.avgpool(lower_max)
         
-        # Concatenations as per equations 5, 6, 7
-        # concat1 = concat(Max(x), Avg(x)) (Equation 5)
-        concat1 = torch.cat([max1_x, avg1_x], dim=1)
-        
-        # concat2 = concat(Max(Max(x)), Avg(Avg(x))) (Equation 6)  
-        concat2 = torch.cat([max2_x, avg2_x], dim=1)
-        
-        # concat3 = concat(Max(Max(Max(x))), Avg(Avg(Avg(x)))) (Equation 7)
-        # Note: For the third level, we use the cross-pathway results
-        concat3 = torch.cat([avg_after_max2, max_after_avg2], dim=1)
-        
-        # Final concatenation (Equation 8: y = concat(concat1, concat2, concat3))
-        # Also include original x for residual-like connection
-        y = torch.cat([x, concat1, concat2, concat3], dim=1)
+        # Concatenate all features as shown in diagram
+        # Original x + all 6 pooling outputs
+        y = torch.cat([
+            x,              # Original features
+            upper_max1,     # First max from upper branch
+            upper_avg,      # Avg from upper branch
+            upper_max2,     # Final max from upper branch
+            lower_avg1,     # First avg from lower branch
+            lower_max,      # Max from lower branch  
+            lower_avg2      # Final avg from lower branch
+        ], dim=1)
         
         # Final convolution and activation
         return self.act(self.bn2(self.cv2(y)))
