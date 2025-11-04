@@ -28,7 +28,7 @@ backbone:
   - [-1, 6, PSMBlock, [512]]    # 6 - PSM instead of C2f
   - [-1, 1, Conv, [1024, 3, 2]] # 7-P5/32
   - [-1, 3, PSMBlock, [1024]]   # 8 - PSM instead of C2f
-  - [-1, 1, SPPF, [1024, 5]]    # 9
+  - [-1, 1, CSPPF, [1024, 5]]   # 9 - CSPPF instead of SPPF for low-light
 
 # DarkYOLOv8.0n head with original C2f blocks
 head:

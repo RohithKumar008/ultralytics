@@ -149,6 +149,76 @@ class TrainableRetinex(nn.Module):
         return torch.clamp(out, -2, 2)  # optional normalization
 
 
+class CSPPF(nn.Module):
+    """Cross-Spatial Pyramid Pooling Feature (CSPPF) module from DarkYOLO.
+    
+    Employs overlapping pooling strategy combining max and average pooling
+    to preserve local information in low-light images. Uses two parallel pathways:
+    - Pathway 1: Max -> Max -> Avg pooling sequence
+    - Pathway 2: Avg -> Avg -> Max pooling sequence
+    """
+    
+    def __init__(self, c1, c2, k=5):
+        super().__init__()
+        c_ = c1 // 2  # hidden channels
+        
+        # If c1 != c2, we need a projection layer
+        if c1 != c2:
+            self.proj = nn.Conv2d(c1, c2, 1, bias=False)
+        else:
+            self.proj = None
+        
+        # Initial convolution (Equation 4: x = Conv(xinput))
+        self.cv1 = nn.Conv2d(c2, c_, 1, bias=False)
+        self.bn1 = nn.BatchNorm2d(c_)
+        
+        # Pooling operations for both pathways
+        self.maxpool1 = nn.MaxPool2d(kernel_size=k, stride=1, padding=k//2)
+        self.avgpool1 = nn.AvgPool2d(kernel_size=k, stride=1, padding=k//2)
+        
+        # Final convolution to combine all concatenated features
+        # Input channels: c_ (original) + 6*c_ (from 6 pooling operations) = 7*c_
+        self.cv2 = nn.Conv2d(7 * c_, c2, 1, bias=False)
+        self.bn2 = nn.BatchNorm2d(c2)
+        self.act = nn.SiLU()
+        
+    def forward(self, x):
+        # Apply projection if needed
+        if self.proj is not None:
+            x = self.proj(x)
+        
+        # Initial convolution (Equation 4)
+        x = self.act(self.bn1(self.cv1(x)))
+        
+        # Pathway 1: Max -> Max -> Avg sequence
+        max1_x = self.maxpool1(x)                    # First max pooling
+        max2_x = self.maxpool1(max1_x)               # Second max pooling  
+        avg_after_max2 = self.avgpool1(max2_x)      # Average after two max
+        
+        # Pathway 2: Avg -> Avg -> Max sequence  
+        avg1_x = self.avgpool1(x)                    # First average pooling
+        avg2_x = self.avgpool1(avg1_x)               # Second average pooling
+        max_after_avg2 = self.maxpool1(avg2_x)      # Max after two average
+        
+        # Concatenations as per equations 5, 6, 7
+        # concat1 = concat(Max(x), Avg(x)) (Equation 5)
+        concat1 = torch.cat([max1_x, avg1_x], dim=1)
+        
+        # concat2 = concat(Max(Max(x)), Avg(Avg(x))) (Equation 6)  
+        concat2 = torch.cat([max2_x, avg2_x], dim=1)
+        
+        # concat3 = concat(Max(Max(Max(x))), Avg(Avg(Avg(x)))) (Equation 7)
+        # Note: For the third level, we use the cross-pathway results
+        concat3 = torch.cat([avg_after_max2, max_after_avg2], dim=1)
+        
+        # Final concatenation (Equation 8: y = concat(concat1, concat2, concat3))
+        # Also include original x for residual-like connection
+        y = torch.cat([x, concat1, concat2, concat3], dim=1)
+        
+        # Final convolution and activation
+        return self.act(self.bn2(self.cv2(y)))
+
+
 class SimAM(nn.Module):
     """Parameter-free SimAM attention mechanism from DarkYOLO PSM block.
     
