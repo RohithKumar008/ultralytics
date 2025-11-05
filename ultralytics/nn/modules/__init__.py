@@ -96,7 +96,7 @@ from .conv import (
     SwinTransformerC,
     SwinTransformerBlock,
 )
-from .custom_enhancements import AdaptivePerChannelGamma, LearnableCLAHE, TrainableRetinex, PSMBlock, CSPPF
+from .custom_enhancements import AdaptivePerChannelGamma, LearnableCLAHE, TrainableRetinex, PSMBlock, CSPPF, DRAMiT
 from .head import (
     OBB,
     Classify,
@@ -225,4 +225,5 @@ __all__ = (
     "TrainableRetinex",
     "PSMBlock",
     "CSPPF",
+    "DRAMiT",
 )

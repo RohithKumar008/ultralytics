@@ -149,6 +149,205 @@ class TrainableRetinex(nn.Module):
         return torch.clamp(out, -2, 2)  # optional normalization
 
 
+class MobiVari(nn.Module):
+    """MobiVari: Modified MobileNet V2 variant for D-RAMiT module.
+    
+    Modifications from original MobileNet V2:
+    - ReLU6 replaced with LeakyReLU activation
+    - First convolution replaced with group convolution
+    - Conditional residual connections (omitted when channel mismatch)
+    """
+    
+    def __init__(self, c1, c2, expansion=6, groups=1):
+        super().__init__()
+        c_hidden = c1 * expansion
+        
+        # Group convolution instead of standard expansion conv
+        self.conv1 = nn.Conv2d(c1, c_hidden, 1, groups=groups, bias=False)
+        self.bn1 = nn.BatchNorm2d(c_hidden)
+        
+        # Depthwise convolution
+        self.conv2 = nn.Conv2d(c_hidden, c_hidden, 3, padding=1, groups=c_hidden, bias=False)
+        self.bn2 = nn.BatchNorm2d(c_hidden)
+        
+        # Pointwise convolution
+        self.conv3 = nn.Conv2d(c_hidden, c2, 1, bias=False)
+        self.bn3 = nn.BatchNorm2d(c2)
+        
+        # LeakyReLU instead of ReLU6
+        self.act = nn.LeakyReLU(0.1)
+        
+        # Residual connection only when input/output channels match
+        self.use_residual = (c1 == c2)
+        
+    def forward(self, x):
+        out = self.act(self.bn1(self.conv1(x)))
+        out = self.act(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        
+        # Conditional residual connection
+        if self.use_residual:
+            out = out + x
+            
+        return out
+
+
+class SpatialSelfAttention(nn.Module):
+    """Spatial Self-Attention (SPSA) for capturing fine-grained local information."""
+    
+    def __init__(self, channels, num_heads=8):
+        super().__init__()
+        self.channels = channels
+        self.num_heads = num_heads
+        self.head_dim = channels // num_heads
+        
+        assert channels % num_heads == 0, "Channels must be divisible by num_heads"
+        
+        self.query = nn.Conv2d(channels, channels, 1, bias=False)
+        self.key = nn.Conv2d(channels, channels, 1, bias=False)
+        self.value = nn.Conv2d(channels, channels, 1, bias=False)
+        self.proj = nn.Conv2d(channels, channels, 1, bias=False)
+        
+        self.scale = self.head_dim ** -0.5
+        
+    def forward(self, x):
+        B, C, H, W = x.shape
+        
+        # Generate Q, K, V
+        q = self.query(x).view(B, self.num_heads, self.head_dim, H * W)
+        k = self.key(x).view(B, self.num_heads, self.head_dim, H * W)
+        v = self.value(x).view(B, self.num_heads, self.head_dim, H * W)
+        
+        # Compute attention weights
+        attn = (q.transpose(-2, -1) @ k) * self.scale  # [B, heads, HW, HW]
+        attn = torch.softmax(attn, dim=-1)
+        
+        # Apply attention to values
+        out = (attn @ v.transpose(-2, -1)).transpose(-2, -1)  # [B, heads, head_dim, HW]
+        out = out.contiguous().view(B, C, H, W)
+        
+        return self.proj(out)
+
+
+class ChannelSelfAttention(nn.Module):
+    """Channel Self-Attention (CHSA) for modeling inter-channel dependencies."""
+    
+    def __init__(self, channels):
+        super().__init__()
+        self.channels = channels
+        
+        self.query = nn.Linear(channels, channels, bias=False)
+        self.key = nn.Linear(channels, channels, bias=False)
+        self.value = nn.Linear(channels, channels, bias=False)
+        self.proj = nn.Linear(channels, channels, bias=False)
+        
+        self.scale = channels ** -0.5
+        
+    def forward(self, x):
+        B, C, H, W = x.shape
+        
+        # Global average pooling to get channel-wise features
+        x_gap = F.adaptive_avg_pool2d(x, 1).view(B, C)  # [B, C]
+        
+        # Generate Q, K, V
+        q = self.query(x_gap)  # [B, C]
+        k = self.key(x_gap)    # [B, C]
+        v = self.value(x_gap)  # [B, C]
+        
+        # Compute attention weights
+        attn = (q @ k.transpose(-2, -1)) * self.scale  # [B, C, C]
+        attn = torch.softmax(attn, dim=-1)
+        
+        # Apply attention to values
+        out = attn @ v  # [B, C]
+        out = self.proj(out)
+        
+        # Broadcast back to spatial dimensions
+        out = out.view(B, C, 1, 1).expand(B, C, H, W)
+        
+        return out
+
+
+class DRAMiT(nn.Module):
+    """Dimension Reciprocal Attention Module (D-RAMiT) from DarkYOLO.
+    
+    Enhances model's ability to capture both global information and local details
+    through parallel Spatial Self-Attention (SPSA) and Channel Self-Attention (CHSA).
+    Includes MobiVari for feature transformation and FFN with LayerNorm.
+    """
+    
+    def __init__(self, c1, c2, num_heads=8, ffn_expansion=4):
+        super().__init__()
+        # If c1 != c2, we need a projection layer
+        if c1 != c2:
+            self.proj = nn.Conv2d(c1, c2, 1, bias=False)
+        else:
+            self.proj = None
+            
+        self.channels = c2
+        
+        # Head Split - divide channels for parallel attention
+        self.head_split_channels = c2 // 2
+        
+        # Spatial Self-Attention (SPSA)
+        self.spsa = SpatialSelfAttention(self.head_split_channels, num_heads//2)
+        
+        # Channel Self-Attention (CHSA)
+        self.chsa = ChannelSelfAttention(self.head_split_channels)
+        
+        # MobiVari module for feature transformation
+        self.mobivari = MobiVari(c2, c2, expansion=6, groups=4)
+        
+        # Layer Normalization
+        self.norm1 = nn.LayerNorm(c2)
+        self.norm2 = nn.LayerNorm(c2)
+        
+        # Feed-Forward Network (FFN)
+        ffn_hidden = c2 * ffn_expansion
+        self.ffn = nn.Sequential(
+            nn.Linear(c2, ffn_hidden),
+            nn.LeakyReLU(0.1),
+            nn.Linear(ffn_hidden, c2)
+        )
+        
+    def forward(self, x):
+        # Apply projection if needed
+        if self.proj is not None:
+            x = self.proj(x)
+            
+        residual = x
+        B, C, H, W = x.shape
+        
+        # Head Split operation
+        x1, x2 = torch.chunk(x, 2, dim=1)  # Split channels
+        
+        # Parallel attention mechanisms
+        spsa_out = self.spsa(x1)  # Spatial Self-Attention
+        chsa_out = self.chsa(x2)  # Channel Self-Attention
+        
+        # Concatenate attention outputs (Equation 11)
+        attention_concat = torch.cat([spsa_out, chsa_out], dim=1)
+        
+        # MobiVari feature transformation
+        mobivari_out = self.mobivari(attention_concat)
+        
+        # First LayerNorm (need to reshape for LayerNorm)
+        x_norm = mobivari_out.view(B, C, -1).transpose(1, 2)  # [B, HW, C]
+        x_norm = self.norm1(x_norm)
+        
+        # Feed-Forward Network
+        ffn_out = self.ffn(x_norm)
+        
+        # Second LayerNorm
+        ffn_out = self.norm2(ffn_out)
+        
+        # Reshape back to spatial dimensions
+        ffn_out = ffn_out.transpose(1, 2).view(B, C, H, W)
+        
+        # Skip connection (residual)
+        return ffn_out + residual
+
+
 class CSPPF(nn.Module):
     """Cross-Spatial Pyramid Pooling Feature (CSPPF) module from DarkYOLO.
     
