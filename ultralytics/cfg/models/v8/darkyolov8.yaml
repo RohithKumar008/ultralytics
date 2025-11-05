@@ -39,7 +39,7 @@ head:
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
   - [[-1, 4], 1, Concat, [1]]   # cat backbone P3
   - [-1, 3, C2f, [256]]         # 15 (P3/8-small) - Keep original C2f in neck
-  - [-1, 1, DRAMiT, [256]]      # 16 - D-RAMiT attention for P3
+  # - [-1, 1, DRAMiT, [256]]      # 16 - D-RAMiT attention for P3
 
   - [-1, 1, Conv, [256, 3, 2]]
   - [[-1, 12], 1, Concat, [1]]  # cat head P4
@@ -49,4 +49,4 @@ head:
   - [[-1, 9], 1, Concat, [1]]   # cat head P5
   - [-1, 3, C2f, [1024]]        # 22 (P5/32-large) - Keep original C2f in neck
 
-  - [[16, 19, 22], 1, Detect, [nc]] # Detect(P3, P4, P5) - using D-RAMiT outputs
+  - [[16, 19, 21], 1, Detect, [nc]] # Detect(P3, P4, P5) - using D-RAMiT outputs
