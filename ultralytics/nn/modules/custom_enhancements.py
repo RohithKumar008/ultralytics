@@ -216,6 +216,13 @@ class SCINet(nn.Module):
         Returns:
             dict with keys: x_list (list of x_t), s_list, u_list, v_list, enhanced
         """
+        # If a projection was created to match channels, apply it to inputs
+        if self.proj is not None:
+            # project x0 and y (if present) to the internal channel size
+            x0 = self.proj(x0)
+            if y is not None:
+                y = self.proj(y)
+
         if y is None:
             # assume x0 is the input image
             y = x0
@@ -235,7 +242,11 @@ class SCINet(nn.Module):
             v_list.append(v)
 
         enhanced = torch.clamp(y / (x_t + 1e-6), 0.0, 1.0)
-        return {"x_list": x_list, "s_list": s_list, "u_list": u_list, "v_list": v_list, "enhanced": enhanced}
+
+        # For Ultralytics model chaining we must return a Tensor (the enhanced image).
+        # If downstream code needs the intermediate lists for debugging, consider
+        # exposing them via an attribute or a separate debug-only method.
+        return enhanced
 
 
 class MobiVari(nn.Module):
