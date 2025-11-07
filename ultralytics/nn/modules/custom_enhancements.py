@@ -149,6 +149,95 @@ class TrainableRetinex(nn.Module):
         return torch.clamp(out, -2, 2)  # optional normalization
 
 
+class SCINet(nn.Module):
+    """SCINet: Simple YAML-friendly implementation of the SCI low-light enhancement module.
+
+    Constructor signature matches YAML-friendly pattern used across Ultralytics modules:
+        SCINet(c1, c2=None, base_ch=32, stages=4, share_weights=True)
+
+    - c1: input channels (from parser)
+    - c2: output channels (optional). If provided and different, a 1x1 proj is applied.
+    - base_ch: internal channel width for the lightweight enhancement blocks
+    - stages: number of cascaded illumination stages
+    - share_weights: whether to reuse the same stage (weight sharing)
+    """
+
+    def __init__(self, c1, c2=None, base_ch=32, stages=4, share_weights=True, *args, **kwargs):
+        super().__init__()
+        if c2 is None:
+            c2 = c1
+        self.c1 = c1
+        self.c2 = c2
+        # projection if channel mismatch
+        self.proj = nn.Conv2d(c1, c2, 1, bias=False) if c1 != c2 else None
+
+        # Lightweight building blocks
+        def make_stage(in_ch, base_ch_inner=base_ch):
+            return nn.Sequential(
+                nn.Conv2d(in_ch, base_ch_inner, 3, padding=1, bias=False),
+                nn.BatchNorm2d(base_ch_inner),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(base_ch_inner, base_ch_inner, 3, padding=1, bias=False),
+                nn.BatchNorm2d(base_ch_inner),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(base_ch_inner, in_ch, 1, bias=True),
+            )
+
+        # self-calibrated module (kappa) and illumination estimator (H)
+        class Stage(nn.Module):
+            def __init__(self, ch, base_ch_local):
+                super().__init__()
+                self.kappa = make_stage(ch, base_ch_local)
+                self.H = make_stage(ch, base_ch_local)
+
+            def forward(self, x_t, y):
+                # z = y / (x + eps)
+                z = y / (x_t + 1e-6)
+                s = torch.tanh(self.kappa(z)) * 0.2
+                v = y + s
+                u = torch.tanh(self.H(v)) * 0.1
+                x_next = x_t + u
+                return x_next, v, s, u
+
+        if share_weights:
+            self.stage = Stage(c2, base_ch)
+            self.stages = stages
+        else:
+            self.stage_list = nn.ModuleList([Stage(c2, base_ch) for _ in range(stages)])
+            self.stages = stages
+        self.share_weights = share_weights
+
+    def forward(self, x0, y=None):
+        """Run cascaded SCI enhancement.
+
+        Args:
+            x0: initial illumination estimate tensor [B,C,H,W]
+            y: input low-light image tensor [B,C,H,W]. If None, x0 is used as input too.
+        Returns:
+            dict with keys: x_list (list of x_t), s_list, u_list, v_list, enhanced
+        """
+        if y is None:
+            # assume x0 is the input image
+            y = x0
+            x_t = x0.clone()
+        else:
+            x_t = x0 if x0 is not None else y.clone()
+
+        x_list, s_list, u_list, v_list = [], [], [], []
+        for t in range(self.stages):
+            if self.share_weights:
+                x_t, v, s, u = self.stage(x_t, y)
+            else:
+                x_t, v, s, u = self.stage_list[t](x_t, y)
+            x_list.append(x_t)
+            s_list.append(s)
+            u_list.append(u)
+            v_list.append(v)
+
+        enhanced = torch.clamp(y / (x_t + 1e-6), 0.0, 1.0)
+        return {"x_list": x_list, "s_list": s_list, "u_list": u_list, "v_list": v_list, "enhanced": enhanced}
+
+
 class MobiVari(nn.Module):
     """MobiVari: Modified MobileNet V2 variant for D-RAMiT module.
     
