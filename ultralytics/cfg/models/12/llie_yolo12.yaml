@@ -19,7 +19,7 @@ scales: # model compound scaling constants, i.e. 'model=llie_yolo12n.yaml' will 
 # LLIE-YOLO12 backbone
 backbone:
   # [from, repeats, module, args]
-  - [-1, 1, ZeroDCE, []]           # 0 - Zero-DCE enhancement (preprocessing)
+  - [-1, 1, ZeroDCE, [3]]           # 0 - Zero-DCE enhancement (preprocessing). First arg must exist for parser; 3=RGB
   - [-1, 1, DWSConv, [64, 3, 2]]     # 0-P1/2  (replaced Conv -> DWSConv)
   - [-1, 1, DWSConv, [128, 3, 2]]    # 1-P2/4  (replaced Conv -> DWSConv)
   - [-1, 2, PSMBlock, [256]]         # 2 - PSMBlock instead of C3k2
