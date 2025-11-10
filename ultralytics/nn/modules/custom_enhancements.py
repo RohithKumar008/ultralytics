@@ -249,6 +249,86 @@ class SCINet(nn.Module):
         return enhanced
 
 
+class ZeroDCENet(nn.Module):
+    """Internal Zero-DCE enhancement network (lightweight) adapted from Zero-DCE repo.
+
+    This is a small, self-contained reimplementation of the `enhance_net_nopool`
+    architecture to avoid cross-package import issues. It outputs an enhanced
+    image tensor.
+    """
+    def __init__(self, in_channels=3, number_f=32):
+        super().__init__()
+        self.relu = nn.ReLU(inplace=True)
+        nf = number_f
+        self.e_conv1 = nn.Conv2d(in_channels, nf, 3, 1, 1, bias=True)
+        self.e_conv2 = nn.Conv2d(nf, nf, 3, 1, 1, bias=True)
+        self.e_conv3 = nn.Conv2d(nf, nf, 3, 1, 1, bias=True)
+        self.e_conv4 = nn.Conv2d(nf, nf, 3, 1, 1, bias=True)
+        self.e_conv5 = nn.Conv2d(nf * 2, nf, 3, 1, 1, bias=True)
+        self.e_conv6 = nn.Conv2d(nf * 2, nf, 3, 1, 1, bias=True)
+        self.e_conv7 = nn.Conv2d(nf * 2, 24, 3, 1, 1, bias=True)
+
+    def forward(self, x):
+        x1 = self.relu(self.e_conv1(x))
+        x2 = self.relu(self.e_conv2(x1))
+        x3 = self.relu(self.e_conv3(x2))
+        x4 = self.relu(self.e_conv4(x3))
+
+        x5 = self.relu(self.e_conv5(torch.cat([x3, x4], 1)))
+        x6 = self.relu(self.e_conv6(torch.cat([x2, x5], 1)))
+
+        x_r = torch.tanh(self.e_conv7(torch.cat([x1, x6], 1)))
+        r1, r2, r3, r4, r5, r6, r7, r8 = torch.split(x_r, 3, dim=1)
+
+        x = x + r1 * (torch.pow(x, 2) - x)
+        x = x + r2 * (torch.pow(x, 2) - x)
+        x = x + r3 * (torch.pow(x, 2) - x)
+        enhance_image_1 = x + r4 * (torch.pow(x, 2) - x)
+        x = enhance_image_1 + r5 * (torch.pow(enhance_image_1, 2) - enhance_image_1)
+        x = x + r6 * (torch.pow(x, 2) - x)
+        x = x + r7 * (torch.pow(x, 2) - x)
+        enhance_image = x + r8 * (torch.pow(x, 2) - x)
+        return enhance_image_1, enhance_image, torch.cat([r1, r2, r3, r4, r5, r6, r7, r8], 1)
+
+
+class ZeroDCE(nn.Module):
+    """YAML-friendly Zero-DCE wrapper.
+
+    Signature: ZeroDCE(c1, c2=None, in_ch=3, base_ch=32)
+    - Projects incoming features to `in_ch` (default 3), runs the ZeroDCE net,
+      then projects the output to `c2` if needed.
+    """
+    def __init__(self, c1, c2=None, in_ch=3, base_ch=32, *args, **kwargs):
+        super().__init__()
+        if c2 is None:
+            c2 = c1
+        self.c1 = c1
+        self.c2 = c2
+        self.in_ch = in_ch
+
+        # projections to map arbitrary channel counts to the 3-channel DCE net and back
+        self.proj_in = nn.Conv2d(c1, in_ch, 1, bias=False) if c1 != in_ch else None
+        self.net = ZeroDCENet(in_channels=in_ch, number_f=base_ch)
+        self.proj_out = nn.Conv2d(in_ch, c2, 1, bias=False) if c2 != in_ch else None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # apply projection to expected input channels
+        if self.proj_in is not None:
+            x_proj = self.proj_in(x)
+        else:
+            x_proj = x
+
+        # ZeroDCE net returns (enhance_image_1, enhance_image, r)
+        _, enhanced, _ = self.net(x_proj)
+
+        # project back to model channels if required
+        if self.proj_out is not None:
+            enhanced = self.proj_out(enhanced)
+
+        # clamp to reasonable range
+        return torch.clamp(enhanced, 0.0, 1.0)
+
+
 class MobiVari(nn.Module):
     """MobiVari: Modified MobileNet V2 variant for D-RAMiT module.
     
