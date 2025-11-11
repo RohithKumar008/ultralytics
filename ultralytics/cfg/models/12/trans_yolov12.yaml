@@ -29,19 +29,19 @@ backbone:
 # Head (unchanged from original YOLO12)
 head:
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
-  - [[-1, 6], 1, Concat, [1]] # cat backbone P4
-  - [-1, 2, A2C2f, [512, False, -1]] # 11
+  - [[-1, 7], 1, Concat, [1]] # cat backbone P4
+  - [-1, 2, A2C2f, [512, False, -1]] # 12
 
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
-  - [[-1, 4], 1, Concat, [1]] # cat backbone P3
-  - [-1, 2, A2C2f, [256, False, -1]] # 14
+  - [[-1, 5], 1, Concat, [1]] # cat backbone P3
+  - [-1, 2, A2C2f, [256, False, -1]] # 15
 
   - [-1, 1, Conv, [256, 3, 2]]
-  - [[-1, 11], 1, Concat, [1]] # cat head P4
-  - [-1, 2, A2C2f, [512, False, -1]] # 17
+  - [[-1, 12], 1, Concat, [1]] # cat head P4
+  - [-1, 2, A2C2f, [512, False, -1]] # 18
 
   - [-1, 1, Conv, [512, 3, 2]]
-  - [[-1, 8], 1, Concat, [1]] # cat head P5
-  - [-1, 2, C3k2, [1024, True]] # 20 (P5/32-large)
+  - [[-1, 9], 1, Concat, [1]] # cat head P5
+  - [-1, 2, C3k2, [1024, True]] # 21 (P5/32-large)
 
-  - [[14, 17, 20], 1, Detect, [nc]] # Detect(P3, P4, P5)
+  - [[15, 18, 21], 1, Detect, [nc]] # Detect(P3, P4, P5)
