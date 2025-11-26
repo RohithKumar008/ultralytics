@@ -1767,6 +1767,10 @@ def parse_model(d, ch, verbose=True):
         if m in base_modules:
             # Support f being either an int or a list (take first source for channel lookup)
             c1 = ch[f[0]] if isinstance(f, (list, tuple)) else ch[f]
+            # If YAML did not provide an explicit output channel (args empty),
+            # default c2 to the input channel c1 so the module preserves channels.
+            if not args:
+                args = [c1]
             c2 = args[0]
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
                 c2 = make_divisible(min(c2, max_channels) * width, 8)
