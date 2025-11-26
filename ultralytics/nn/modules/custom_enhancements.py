@@ -235,11 +235,10 @@ class FeatureFusionAttention(nn.Module):
 
         ch = c1
         red = max(ch // 4, 1)
-        self.channel = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Conv2d(ch, red, 1, bias=True), nn.ReLU(inplace=True),
-            nn.Conv2d(red, ch, 1, bias=True), nn.Sigmoid()
-        )
+        # We'll lazily instantiate channel attention and denoise blocks at
+        # first forward pass to avoid mismatches between parser-inferred
+        # constructor channels and actual runtime feature channels.
+        self.channel = None
 
         self.spatial = nn.Sequential(
             nn.Conv2d(1, 4, 3, 1, 1, bias=True), nn.ReLU(inplace=True),
@@ -247,10 +246,7 @@ class FeatureFusionAttention(nn.Module):
         )
 
         # small denoising conv block (lightweight)
-        self.denoise = nn.Sequential(
-            nn.Conv2d(ch, ch, 3, 1, 1, bias=True), nn.ReLU(inplace=True),
-            nn.Conv2d(ch, ch, 3, 1, 1, bias=True)
-        )
+        self.denoise = None
 
         # projection if input/output channel mismatch (keeps API safe)
         self.proj_in = nn.Conv2d(c1, c2, 1, bias=False) if c1 != c2 else None
@@ -265,6 +261,24 @@ class FeatureFusionAttention(nn.Module):
 
         if self.proj_in is not None:
             feat = self.proj_in(feat)
+
+        # Lazy init of submodules based on runtime channel dimension
+        b, c_feat, h_feat, w_feat = feat.shape
+        if self.channel is None:
+            red = max(c_feat // 4, 1)
+            self.channel = nn.Sequential(
+                nn.AdaptiveAvgPool2d(1),
+                nn.Conv2d(c_feat, red, 1, bias=True), nn.ReLU(inplace=True),
+                nn.Conv2d(red, c_feat, 1, bias=True), nn.Sigmoid(),
+            )
+            # register to ensure parameters are tracked
+            self.add_module('channel', self.channel)
+        if self.denoise is None:
+            self.denoise = nn.Sequential(
+                nn.Conv2d(c_feat, c_feat, 3, 1, 1, bias=True), nn.ReLU(inplace=True),
+                nn.Conv2d(c_feat, c_feat, 3, 1, 1, bias=True),
+            )
+            self.add_module('denoise', self.denoise)
 
         if illum is None:
             # If illumination not provided, fallback to identity spatial attention
