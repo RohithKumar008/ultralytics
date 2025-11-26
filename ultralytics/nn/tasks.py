@@ -1712,6 +1712,7 @@ def parse_model(d, ch, verbose=True):
             LightEnhancer,
             IlluminationHead,
             ConvLEM,
+            FeatureFusionAttention,
             PSMBlock,
             ZeroDCE,
             SCINet,
