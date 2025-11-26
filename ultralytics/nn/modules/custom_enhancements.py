@@ -149,6 +149,159 @@ class TrainableRetinex(nn.Module):
         return torch.clamp(out, -2, 2)  # optional normalization
 
 
+class LightEnhancer(nn.Module):
+    """Tiny per-pixel curve enhancer (YAML-friendly signature).
+
+    Constructor: LightEnhancer(c1, c2=None, hidden=16, n_iter=3)
+    - c1: input channels
+    - c2: output channels (if different, a 1x1 proj is applied)
+    """
+
+    def __init__(self, c1, c2=None, hidden=16, n_iter=3, *args, **kwargs):
+        super().__init__()
+        if c2 is None:
+            c2 = c1
+        self.c1 = c1
+        self.c2 = c2
+        self.n_iter = n_iter
+
+        # projection to desired internal channels if needed
+        self.proj_in = nn.Conv2d(c1, c2, 1, bias=False) if c1 != c2 else None
+
+        self.net = nn.Sequential(
+            nn.Conv2d(c2, hidden, 3, 1, 1, bias=True), nn.ReLU(inplace=True),
+            nn.Conv2d(hidden, hidden, 3, 1, 1, bias=True), nn.ReLU(inplace=True),
+            nn.Conv2d(hidden, c2 * n_iter, 1, 1, 0, bias=True)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: [B,c1,H,W], expected in [0,1]
+        if self.proj_in is not None:
+            x = self.proj_in(x)
+
+        params = self.net(x)  # B x (c2*n_iter) x H x W
+        b, c, h, w = params.shape
+        params = params.view(b, self.c2, self.n_iter, h, w)
+
+        out = x
+        # iterative curve: out = out + a * out * (1 - out)
+        for i in range(self.n_iter):
+            a = torch.tanh(params[:, :, i])
+            out = out + a * (out * (1.0 - out))
+        return out.clamp(0.0, 1.0)
+
+
+class IlluminationHead(nn.Module):
+    """Predict low-res illumination map used to gate features.
+
+    Constructor: IlluminationHead(c1, c2=None, out_size=(20,20))
+    - c1: feature channels
+    - returns: B x 1 x H x W (low-res)
+    """
+
+    def __init__(self, c1, c2=None, out_size=(20, 20), *args, **kwargs):
+        super().__init__()
+        # c2 unused but accepted for parser compatibility
+        if c2 is None:
+            c2 = c1
+        self.c1 = c1
+        self.c2 = c2
+        self.out_size = out_size
+
+        self.pool = nn.AdaptiveAvgPool2d(out_size)
+        self.conv = nn.Sequential(
+            nn.Conv2d(c1, max(c1 // 2, 8), 3, 1, 1, bias=True), nn.ReLU(inplace=True),
+            nn.Conv2d(max(c1 // 2, 8), 1, 1, 1, 0, bias=True), nn.Sigmoid()
+        )
+
+    def forward(self, feat: torch.Tensor) -> torch.Tensor:
+        p = self.pool(feat)
+        return self.conv(p)
+
+
+class FeatureFusionAttention(nn.Module):
+    """Channel + spatial attention conditioned on illumination map.
+
+    Constructor: FeatureFusionAttention(c1, c2=None)
+    - c1: feature channels
+    """
+
+    def __init__(self, c1, c2=None, *args, **kwargs):
+        super().__init__()
+        if c2 is None:
+            c2 = c1
+        self.c1 = c1
+        self.c2 = c2
+
+        ch = c1
+        red = max(ch // 4, 1)
+        self.channel = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(ch, red, 1, bias=True), nn.ReLU(inplace=True),
+            nn.Conv2d(red, ch, 1, bias=True), nn.Sigmoid()
+        )
+
+        self.spatial = nn.Sequential(
+            nn.Conv2d(1, 4, 3, 1, 1, bias=True), nn.ReLU(inplace=True),
+            nn.Conv2d(4, 1, 1, bias=True), nn.Sigmoid()
+        )
+
+        # small denoising conv block (lightweight)
+        self.denoise = nn.Sequential(
+            nn.Conv2d(ch, ch, 3, 1, 1, bias=True), nn.ReLU(inplace=True),
+            nn.Conv2d(ch, ch, 3, 1, 1, bias=True)
+        )
+
+        # projection if input/output channel mismatch (keeps API safe)
+        self.proj_in = nn.Conv2d(c1, c2, 1, bias=False) if c1 != c2 else None
+
+    def forward(self, x, illum=None) -> torch.Tensor:
+        # Accept either (feat, illum) as two args or a single list/tuple [feat, illum]
+        if isinstance(x, (list, tuple)):
+            feat = x[0]
+            illum = x[1]
+        else:
+            feat = x
+
+        if self.proj_in is not None:
+            feat = self.proj_in(feat)
+
+        if illum is None:
+            # If illumination not provided, fallback to identity spatial attention
+            illum_up = torch.ones((feat.shape[0], 1, feat.shape[2], feat.shape[3]), device=feat.device, dtype=feat.dtype)
+        else:
+            illum_up = F.interpolate(illum, size=feat.shape[2:], mode='bilinear', align_corners=False)
+
+        c_att = self.channel(feat)  # BxCx1x1
+        s_att = self.spatial(illum_up)  # Bx1xhxw
+        out = feat * c_att * s_att + self.denoise(feat)
+        return out
+
+
+class ConvLEM(nn.Module):
+    """Conv layer followed by a lightweight enhancer applied to the conv feature.
+
+    Constructor signature matches Conv-style usage in model YAMLs: ConvLEM(c1, c2, k, s, p)
+    """
+
+    def __init__(self, c1, c2, k=3, s=1, p=None, *args, **kwargs):
+        super().__init__()
+        pad = k // 2 if p is None else p
+        self.conv = nn.Conv2d(c1, c2, k, s, pad, bias=False)
+        self.bn = nn.BatchNorm2d(c2)
+        self.act = nn.SiLU(inplace=True)
+        # lightweight enhancer operates on conv features
+        hidden = max(c2 // 4, 16)
+        self.enh = LightEnhancer(c2, c2, hidden=hidden, n_iter=3)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.act(x)
+        x = self.enh(x)
+        return x
+
+
 class SCINet(nn.Module):
     """SCINet: Simple YAML-friendly implementation of the SCI low-light enhancement module.
 
