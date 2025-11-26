@@ -96,7 +96,7 @@ from .conv import (
     SwinTransformerC,
     SwinTransformerBlock,
 )
-from .custom_enhancements import AdaptivePerChannelGamma, LearnableCLAHE, TrainableRetinex, PSMBlock, CSPPF, DRAMiT, SCINet, ZeroDCE, LightEnhancer, IlluminationHead, FeatureFusionAttention
+from .custom_enhancements import AdaptivePerChannelGamma, LearnableCLAHE, TrainableRetinex, PSMBlock, CSPPF, DRAMiT, SCINet, ZeroDCE, LightEnhancer, IlluminationHead, FeatureFusionAttention, ConvLEM
 from .head import (
     OBB,
     Classify,
@@ -229,6 +229,7 @@ __all__ = (
     "LightEnhancer",
     "IlluminationHead",
     "FeatureFusionAttention",
+    "ConvLEM",
     "DRAMiT",
     "SCINet",
 )
