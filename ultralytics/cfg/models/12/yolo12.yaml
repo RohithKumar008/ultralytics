@@ -31,7 +31,7 @@ head:
 
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
   - [[-1, 4], 1, Concat, [1]] # cat backbone P3
-  - [-1, 2, A2C2f, [256, False, -1]] # 14
+  - [-1, 2, A2C2f, [256, False, -1]] # 16
 
   # Apply feature fusion attention to the processed P3 feature using illum map
   # Apply feature fusion attention to the processed P3 feature using illum map
@@ -40,7 +40,7 @@ head:
 
   - [-1, 1, Conv, [256, 3, 2]]
   - [[18, 13], 1, Concat, [1]] # cat head P4: previous conv (18) and fused P4 (13)
-  - [-1, 2, A2C2f, [512, False, -1]] # 17
+  - [-1, 2, A2C2f, [512, False, -1]] # 20
 
   - [-1, 1, Conv, [512, 3, 2]]
   - [[-1, 8], 1, Concat, [1]] # cat head P5
